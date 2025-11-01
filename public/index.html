@@ -22,6 +22,26 @@
     <script type='text/javascript'>
     function initEmbeddedMessaging() {
         try {
+            // Wait for DOM to be fully ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    initializeAgent();
+                });
+            } else {
+                initializeAgent();
+            }
+        } catch (err) {
+            console.error('Error in initEmbeddedMessaging: ', err);
+        }
+    }
+
+    function initializeAgent() {
+        try {
+            if (typeof embeddedservice_bootstrap === 'undefined') {
+                console.error('embeddedservice_bootstrap is not defined');
+                return;
+            }
+
             embeddedservice_bootstrap.settings.language = 'en_US';
             embeddedservice_bootstrap.init(
                 '00DHu00000izUN6',
@@ -31,8 +51,19 @@
                     scrt2URL: 'https://storm-11c5bf736713cf.my.salesforce-scrt.com'
                 }
             );
+
+            // Try to position the widget inside our modal after a delay
+            setTimeout(function() {
+                var widget = document.querySelector('.esw-overlay-container, .embeddedServiceHelpButton, .embeddedServiceSidebar');
+                if (widget) {
+                    var modalAgent = document.getElementById('embedded-messaging-agent');
+                    if (modalAgent) {
+                        modalAgent.appendChild(widget);
+                    }
+                }
+            }, 2000);
         } catch (err) {
-            console.error('Error loading Embedded Messaging: ', err);
+            console.error('Error initializing Agent: ', err);
         }
     }
     </script>

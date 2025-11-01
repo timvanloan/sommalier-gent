@@ -45,7 +45,7 @@ body {
 .modal-content {
     width: 100%;
     height: 100%;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border-radius: 20px;
@@ -54,13 +54,44 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 #embedded-messaging-agent {
     width: 100%;
     height: 100%;
     border-radius: 15px;
-    overflow: hidden;
+    overflow: visible;
+    min-height: 600px;
+    background: transparent;
+    position: relative;
+}
+
+/* Style Agentforce widget container */
+.esw-overlay,
+.esw-overlay-container,
+.esw-overlay-frame,
+.embeddedServiceHelpButton,
+.embeddedServiceSidebar,
+.embeddedService {
+    border-radius: 15px !important;
+}
+
+/* Ensure Agentforce elements are visible and positioned correctly */
+#embedded-messaging-agent .embeddedServiceHelpButton,
+#embedded-messaging-agent .embeddedServiceSidebar,
+#embedded-messaging-agent .esw-overlay-container {
+    position: relative !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Make sure iframe is visible */
+.embeddedServiceSidebar iframe,
+.esw-overlay iframe {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 15px !important;
 }
 
 /* Responsive adjustments for mobile */
