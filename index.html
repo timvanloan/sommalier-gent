@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sommalier Gent - Wine Agent</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="background-container">
+        <img src="winery-background.png" alt="Winery Background" class="background-image">
+    </div>
+    
+    <div class="modal-container" id="agentModal">
+        <div class="modal-content">
+            <!-- Agentforce Embedded Messaging Agent -->
+            <div id="embedded-messaging-agent"></div>
+        </div>
+    </div>
+
+    <!-- Agentforce Bootstrap Script -->
+    <script type='text/javascript'>
+    function initEmbeddedMessaging() {
+        try {
+            embeddedservice_bootstrap.settings.language = 'en_US';
+            embeddedservice_bootstrap.init(
+                '00DHu00000izUN6',
+                'WSJ_Wine_Agent',
+                'https://storm-11c5bf736713cf.my.site.com/ESWWSJWineAgent1761689847665',
+                {
+                    scrt2URL: 'https://storm-11c5bf736713cf.my.salesforce-scrt.com'
+                }
+            );
+        } catch (err) {
+            console.error('Error loading Embedded Messaging: ', err);
+        }
+    }
+    </script>
+    <script type='text/javascript' src='https://storm-11c5bf736713cf.my.site.com/ESWWSJWineAgent1761689847665/assets/js/bootstrap.min.js' onload='initEmbeddedMessaging()'></script>
+</body>
+</html>
