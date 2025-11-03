@@ -76,7 +76,7 @@ body {
 
 /* Make the entire embedded messaging agent container semi-transparent */
 #embedded-messaging-agent {
-    opacity: 0.5 !important;
+    opacity: 0.8 !important;
 }
 
 /* Force sidebar to be positioned in our modal if it exists */
