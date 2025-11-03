@@ -61,37 +61,66 @@ body {
     width: 100%;
     height: 100%;
     border-radius: 15px;
-    overflow: visible;
+    overflow: hidden;
     min-height: 600px;
     background: transparent;
     position: relative;
+}
+
+/* Hide the floating button completely */
+.embeddedServiceHelpButton {
+    display: none !important;
+}
+
+/* Style the sidebar to fill the modal */
+.embeddedServiceSidebar {
+    position: relative !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    border-radius: 15px !important;
+    box-shadow: none !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* When sidebar is inside our modal, make it fill the container */
+#embedded-messaging-agent .embeddedServiceSidebar {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 15px !important;
+}
+
+/* Style iframe inside sidebar */
+.embeddedServiceSidebar iframe,
+#embedded-messaging-agent .embeddedServiceSidebar iframe {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 15px !important;
+    border: none !important;
 }
 
 /* Style Agentforce widget container */
 .esw-overlay,
 .esw-overlay-container,
 .esw-overlay-frame,
-.embeddedServiceHelpButton,
-.embeddedServiceSidebar,
 .embeddedService {
     border-radius: 15px !important;
 }
 
-/* Ensure Agentforce elements are visible and positioned correctly */
-#embedded-messaging-agent .embeddedServiceHelpButton,
-#embedded-messaging-agent .embeddedServiceSidebar,
-#embedded-messaging-agent .esw-overlay-container {
-    position: relative !important;
-    width: 100% !important;
-    height: 100% !important;
-}
-
-/* Make sure iframe is visible */
-.embeddedServiceSidebar iframe,
-.esw-overlay iframe {
-    width: 100% !important;
-    height: 100% !important;
-    border-radius: 15px !important;
+/* Ensure sidebar is visible when moved to modal */
+#embedded-messaging-agent .embeddedServiceSidebar.open {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 /* Responsive adjustments for mobile */

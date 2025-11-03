@@ -22,7 +22,7 @@
     <script type='text/javascript'>
     function initEmbeddedMessaging() {
         try {
-            embeddedservice_bootstrap.settings.language = 'en_US'; // For example, enter 'en' or 'en-US'
+            embeddedservice_bootstrap.settings.language = 'en_US';
 
             embeddedservice_bootstrap.init(
                 '00DHu00000izUN6',
@@ -33,16 +33,60 @@
                 }
             );
 
-            // Try to position the widget inside our modal after a delay
-            setTimeout(function() {
-                var widget = document.querySelector('.esw-overlay-container, .embeddedServiceHelpButton, .embeddedServiceSidebar');
-                if (widget) {
-                    var modalAgent = document.getElementById('embedded-messaging-agent');
-                    if (modalAgent) {
-                        modalAgent.appendChild(widget);
+            // Wait for widget to be created, then embed it in modal and auto-open
+            var checkInterval = setInterval(function() {
+                var sidebar = document.querySelector('.embeddedServiceSidebar');
+                var button = document.querySelector('.embeddedServiceHelpButton');
+                var modalAgent = document.getElementById('embedded-messaging-agent');
+                
+                if (sidebar && modalAgent) {
+                    clearInterval(checkInterval);
+                    
+                    // Move sidebar into modal
+                    modalAgent.appendChild(sidebar);
+                    
+                    // Hide the floating button
+                    if (button) {
+                        button.style.display = 'none';
                     }
+                    
+                    // Open the chat automatically
+                    setTimeout(function() {
+                        // Try multiple methods to open the chat
+                        var chatButton = document.querySelector('.embeddedServiceHelpButton, .embeddedServiceIcon, button[aria-label*="chat"], button[aria-label*="Chat"]');
+                        if (chatButton) {
+                            chatButton.click();
+                        }
+                        
+                        // Also try to trigger the embedded service to show
+                        if (window.embeddedservice_bootstrap && window.embeddedservice_bootstrap.openEmbeddedMessaging) {
+                            window.embeddedservice_bootstrap.openEmbeddedMessaging();
+                        }
+                        
+                        // Directly show the sidebar if it exists
+                        if (sidebar) {
+                            sidebar.style.display = 'block';
+                            sidebar.style.visibility = 'visible';
+                            sidebar.style.opacity = '1';
+                            sidebar.classList.add('open');
+                            
+                            // Try to trigger any embedded service events
+                            var event = new Event('embeddedservice:show');
+                            document.dispatchEvent(event);
+                            
+                            // Also try messaging API if available
+                            if (window.embeddedservice && window.embeddedservice.messaging) {
+                                window.embeddedservice.messaging.show();
+                            }
+                        }
+                    }, 500);
                 }
-            }, 2000);
+            }, 100);
+            
+            // Stop checking after 10 seconds
+            setTimeout(function() {
+                clearInterval(checkInterval);
+            }, 10000);
         } catch (err) {
             console.error('Error loading Embedded Messaging: ', err);
         }
