@@ -82,6 +82,36 @@
             button.style.display = 'none';
         }
         
+        // Try to change agent name from "chat" to "Agentforce Sommelier-gent"
+        try {
+            // Look for common selectors that might contain the agent name
+            var titleElements = document.querySelectorAll('[title*="chat"], [aria-label*="chat"], .esw-header, .esw-title, [class*="title"], [class*="header"]');
+            titleElements.forEach(function(el) {
+                if (el.textContent && el.textContent.toLowerCase().includes('chat')) {
+                    el.textContent = el.textContent.replace(/chat/gi, 'Agentforce Sommelier-gent');
+                }
+            });
+            
+            // Also check for text nodes that might contain "chat"
+            var walker = document.createTreeWalker(
+                document.body,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+            
+            var node;
+            while (node = walker.nextNode()) {
+                if (node.textContent.toLowerCase().includes('chat') && 
+                    !node.parentElement.closest('iframe') &&
+                    node.textContent.trim().length < 50) {
+                    node.textContent = node.textContent.replace(/chat/gi, 'Agentforce Sommelier-gent');
+                }
+            }
+        } catch (err) {
+            // Silently fail if we can't modify the text
+        }
+        
         // Stop checking after widget is found and moved
         if (sidebar && targetContainer.contains(sidebar)) {
             clearInterval(widgetChecker);
@@ -92,6 +122,22 @@
     setTimeout(function() {
         clearInterval(widgetChecker);
     }, 10000);
+    
+    // Additional attempt to change agent name after iframe loads
+    setTimeout(function() {
+        try {
+            var iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
+            if (iframe && iframe.contentWindow) {
+                // Try to send postMessage to change title (if Salesforce supports it)
+                iframe.contentWindow.postMessage({
+                    type: 'setTitle',
+                    title: 'Agentforce Sommelier-gent'
+                }, '*');
+            }
+        } catch (err) {
+            // Cross-origin iframe - can't access directly
+        }
+    }, 2000);
     </script>
     <script type='text/javascript' src='https://storm-11c5bf736713cf.my.site.com/ESWSommalierGent1762152842517/assets/js/bootstrap.min.js' onload='initEmbeddedMessaging()'></script>
 </body>

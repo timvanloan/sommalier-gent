@@ -157,6 +157,16 @@ body {
     left: 0 !important;
 }
 
+/* Try to override agent name text if it appears outside iframe */
+#embedded-messaging-agent *:not(iframe) {
+    text-transform: none !important;
+}
+
+/* Hide any text containing "chat" and replace with custom title if possible */
+#embedded-messaging-agent *:not(iframe) {
+    font-family: inherit !important;
+}
+
 /* Responsive adjustments for mobile */
 @media (max-width: 768px) {
     .header-image {
