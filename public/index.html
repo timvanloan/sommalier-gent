@@ -58,6 +58,48 @@
         }
     });
     
+    // Function to force resize agent interface to full width
+    function forceResizeAgent() {
+        if (!targetContainer) return;
+        
+        // Get modal width
+        var modalWidth = targetContainer.offsetWidth || targetContainer.clientWidth;
+        
+        // Find all elements that might be constraining width
+        var sidebar = document.querySelector('.embeddedServiceSidebar');
+        var iframes = targetContainer.querySelectorAll('iframe');
+        var allDivs = targetContainer.querySelectorAll('div');
+        
+        // Force sidebar to full width
+        if (sidebar) {
+            sidebar.style.width = modalWidth + 'px';
+            sidebar.style.maxWidth = 'none';
+            sidebar.style.minWidth = modalWidth + 'px';
+        }
+        
+        // Force all iframes to full width
+        iframes.forEach(function(iframe) {
+            iframe.style.width = modalWidth + 'px';
+            iframe.style.maxWidth = 'none';
+            iframe.style.minWidth = modalWidth + 'px';
+        });
+        
+        // Force all divs inside container to remove max-width constraints
+        allDivs.forEach(function(div) {
+            var computedStyle = window.getComputedStyle(div);
+            var currentMaxWidth = computedStyle.maxWidth;
+            
+            // Only override if it's a pixel value (not 'none' or percentage)
+            if (currentMaxWidth && currentMaxWidth !== 'none' && currentMaxWidth.includes('px')) {
+                var maxWidthValue = parseInt(currentMaxWidth);
+                if (maxWidthValue < modalWidth) {
+                    div.style.maxWidth = 'none';
+                    div.style.width = '100%';
+                }
+            }
+        });
+    }
+    
     // Also try to catch and move the widget if it appears elsewhere
     var widgetChecker = setInterval(function() {
         var sidebar = document.querySelector('.embeddedServiceSidebar');
@@ -74,6 +116,9 @@
                 } catch (err) {
                     console.error('Error moving sidebar:', err);
                 }
+            } else {
+                // Sidebar is in container, force resize
+                forceResizeAgent();
             }
         }
         
@@ -82,15 +127,22 @@
             button.style.display = 'none';
         }
         
-        // Stop checking after widget is found and moved
+        // Force resize even if sidebar is already in container
         if (sidebar && targetContainer.contains(sidebar)) {
-            clearInterval(widgetChecker);
+            forceResizeAgent();
         }
     }, 200);
     
-    // Stop checking after 10 seconds
+    // Also resize on window resize
+    window.addEventListener('resize', function() {
+        forceResizeAgent();
+    });
+    
+    // Stop checking after 10 seconds, but keep resize function active
     setTimeout(function() {
         clearInterval(widgetChecker);
+        // Continue forcing resize every 500ms
+        setInterval(forceResizeAgent, 500);
     }, 10000);
     </script>
     <script type='text/javascript' src='https://storm-11c5bf736713cf.my.site.com/ESWSommalierGent1762152842517/assets/js/bootstrap.min.js' onload='initEmbeddedMessaging()'></script>
