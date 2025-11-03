@@ -27,37 +27,11 @@ body {
     overflow: hidden;
 }
 
-.header-text {
-    text-align: center;
-}
-
-.header-line-1 {
-    font-family: 'Georgia', 'Times New Roman', 'Palatino', 'Book Antiqua', serif;
-    font-size: 2rem;
-    font-weight: 400;
-    color: #722F37;
-    letter-spacing: 0.05em;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    margin: 0;
-    line-height: 1.4;
-}
-
-.header-line-2 {
-    font-family: 'Georgia', 'Times New Roman', 'Palatino', 'Book Antiqua', serif;
-    font-size: 3.5rem;
-    font-weight: 400;
-    color: #722F37;
-    letter-spacing: 0.05em;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    margin: 0;
-    line-height: 1.2;
-}
-
-.header-logo {
-    margin-top: 20px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+.header-image {
+    max-width: 100%;
+    height: auto;
+    max-height: 30vh;
+    object-fit: contain;
 }
 
 .background-container {
@@ -123,7 +97,6 @@ body {
     min-height: 600px;
     background: transparent;
     position: relative;
-    opacity: 0.85 !important;
 }
 
 /* Hide the floating button completely */
@@ -188,18 +161,8 @@ body {
 
 /* Responsive adjustments for mobile */
 @media (max-width: 768px) {
-    .header-line-1 {
-        font-size: 1.5rem;
-    }
-    
-    .header-line-2 {
-        font-size: 2.5rem;
-        padding: 0 10px;
-    }
-    
-    .header-logo svg {
-        width: 90px;
-        height: 90px;
+    .header-image {
+        max-height: 25vh;
     }
     
     .modal-container {
@@ -215,18 +178,8 @@ body {
 }
 
 @media (max-width: 480px) {
-    .header-line-1 {
-        font-size: 1.2rem;
-    }
-    
-    .header-line-2 {
-        font-size: 1.8rem;
-        padding: 0 10px;
-    }
-    
-    .header-logo svg {
-        width: 70px;
-        height: 70px;
+    .header-image {
+        max-height: 20vh;
     }
     
     .modal-container {
