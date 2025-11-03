@@ -82,6 +82,8 @@ body {
     right: 0 !important;
     bottom: 0 !important;
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
     height: 100% !important;
     border-radius: 15px !important;
     overflow: hidden !important;
@@ -96,6 +98,8 @@ body {
     right: 0 !important;
     bottom: 0 !important;
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
     height: 100% !important;
     border-radius: 15px !important;
     overflow: hidden !important;
@@ -103,28 +107,43 @@ body {
 
 /* Style the embedded messaging container when it's in our modal */
 #embedded-messaging-agent .embeddedService,
-#embedded-messaging-agent .esw-overlay-container {
+#embedded-messaging-agent .esw-overlay-container,
+#embedded-messaging-agent > * {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
     height: 100% !important;
     border-radius: 15px !important;
     overflow: hidden !important;
 }
 
-/* Style iframe inside the embedded messaging */
+/* Style iframe inside the embedded messaging - force full width */
 #embedded-messaging-agent iframe,
-.embeddedServiceSidebar iframe {
+.embeddedServiceSidebar iframe,
+#embedded-messaging-agent .embeddedService iframe,
+#embedded-messaging-agent .esw-overlay-container iframe {
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
     height: 100% !important;
     border-radius: 15px !important;
     border: none !important;
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
+}
+
+/* Target any wrapper divs that might be constraining width */
+#embedded-messaging-agent div,
+#embedded-messaging-agent .embeddedServiceSidebar div,
+#embedded-messaging-agent .embeddedService div {
+    max-width: 100% !important;
+    width: 100% !important;
 }
 
 /* Responsive adjustments for mobile */
