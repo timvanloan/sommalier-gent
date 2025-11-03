@@ -57,8 +57,8 @@ body {
     transform: translate(-50%, -50%);
     width: 90%;
     max-width: 800px;
-    height: 95vh;
-    max-height: 1000px;
+    height: 80vh;
+    max-height: 800px;
     z-index: 1000;
     display: flex;
     align-items: center;
@@ -67,8 +67,8 @@ body {
 
 @media (max-height: 800px) {
     .modal-container {
-        height: 90vh;
-        max-height: 850px;
+        height: 80vh;
+        max-height: 700px;
     }
 }
 
@@ -92,7 +92,7 @@ body {
     height: 100%;
     border-radius: 15px;
     overflow: hidden;
-    min-height: 850px;
+    min-height: 600px;
     background: transparent;
     position: relative;
 }
@@ -165,8 +165,8 @@ body {
     
     .modal-container {
         width: 95%;
-        height: 90vh;
-        max-height: 850px;
+        height: 80vh;
+        max-height: 700px;
     }
     
     .modal-content {
