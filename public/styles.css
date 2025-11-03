@@ -57,7 +57,7 @@ body {
     width: 90%;
     max-width: 800px;
     height: 100vh;
-    max-height: none;
+    max-height: 2000px;
     z-index: 1000;
     display: flex;
     align-items: center;
@@ -67,7 +67,7 @@ body {
 @media (max-height: 800px) {
     .modal-container {
         height: 100vh;
-        max-height: none;
+        max-height: 2000px;
     }
 }
 
@@ -165,7 +165,7 @@ body {
     .modal-container {
         width: 95%;
         height: 100vh;
-        max-height: none;
+        max-height: 2000px;
     }
     
     .modal-content {
