@@ -20,6 +20,48 @@
 
     <!-- Agentforce Bootstrap Script -->
     <script type='text/javascript'>
+    // Set up observer to catch sidebar creation
+    var sidebarObserver = null;
+    var modalAgent = document.getElementById('embedded-messaging-agent');
+    
+    function moveSidebarToModal(sidebar) {
+        if (!sidebar || !modalAgent) return false;
+        
+        // Check if already moved
+        if (sidebar.parentElement === modalAgent) {
+            return true;
+        }
+        
+        try {
+            // Force remove from current location
+            if (sidebar.parentNode) {
+                sidebar.parentNode.removeChild(sidebar);
+            }
+            
+            // Add to modal
+            modalAgent.appendChild(sidebar);
+            
+            // Force styles
+            sidebar.style.position = 'absolute';
+            sidebar.style.top = '0';
+            sidebar.style.left = '0';
+            sidebar.style.right = '0';
+            sidebar.style.bottom = '0';
+            sidebar.style.width = '100%';
+            sidebar.style.height = '100%';
+            sidebar.style.display = 'block';
+            sidebar.style.visibility = 'visible';
+            sidebar.style.opacity = '1';
+            sidebar.style.zIndex = '1001';
+            sidebar.classList.add('embedded-in-modal');
+            
+            return true;
+        } catch (err) {
+            console.error('Error moving sidebar:', err);
+            return false;
+        }
+    }
+    
     function initEmbeddedMessaging() {
         try {
             embeddedservice_bootstrap.settings.language = 'en_US';
@@ -33,60 +75,70 @@
                 }
             );
 
-            // Wait for widget to be created, then embed it in modal and auto-open
+            // Use MutationObserver to catch sidebar when it's created
+            sidebarObserver = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.nodeType === 1) { // Element node
+                            // Check if this is the sidebar or contains it
+                            var sidebar = null;
+                            if (node.classList && node.classList.contains('embeddedServiceSidebar')) {
+                                sidebar = node;
+                            } else {
+                                sidebar = node.querySelector && node.querySelector('.embeddedServiceSidebar');
+                            }
+                            
+                            if (sidebar) {
+                                moveSidebarToModal(sidebar);
+                            }
+                        }
+                    });
+                });
+            });
+            
+            // Start observing the body for changes
+            sidebarObserver.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+            
+            // Also check periodically as backup
             var checkInterval = setInterval(function() {
-                var sidebar = document.querySelector('.embeddedServiceSidebar');
+                var sidebar = document.querySelector('.embeddedServiceSidebar:not(.embedded-in-modal)');
                 var button = document.querySelector('.embeddedServiceHelpButton');
-                var modalAgent = document.getElementById('embedded-messaging-agent');
                 
-                if (sidebar && modalAgent) {
-                    clearInterval(checkInterval);
-                    
-                    // Move sidebar into modal
-                    modalAgent.appendChild(sidebar);
-                    
-                    // Hide the floating button
-                    if (button) {
-                        button.style.display = 'none';
-                    }
-                    
-                    // Open the chat automatically
-                    setTimeout(function() {
-                        // Try multiple methods to open the chat
-                        var chatButton = document.querySelector('.embeddedServiceHelpButton, .embeddedServiceIcon, button[aria-label*="chat"], button[aria-label*="Chat"]');
-                        if (chatButton) {
-                            chatButton.click();
-                        }
-                        
-                        // Also try to trigger the embedded service to show
-                        if (window.embeddedservice_bootstrap && window.embeddedservice_bootstrap.openEmbeddedMessaging) {
-                            window.embeddedservice_bootstrap.openEmbeddedMessaging();
-                        }
-                        
-                        // Directly show the sidebar if it exists
-                        if (sidebar) {
+                if (sidebar) {
+                    if (moveSidebarToModal(sidebar)) {
+                        // Auto-open after moving
+                        setTimeout(function() {
+                            // Hide button
+                            if (button) {
+                                button.style.display = 'none';
+                            }
+                            
+                            // Try to open chat
+                            if (window.embeddedservice_bootstrap && window.embeddedservice_bootstrap.openEmbeddedMessaging) {
+                                window.embeddedservice_bootstrap.openEmbeddedMessaging();
+                            }
+                            
+                            // Ensure sidebar is visible
                             sidebar.style.display = 'block';
                             sidebar.style.visibility = 'visible';
                             sidebar.style.opacity = '1';
-                            sidebar.classList.add('open');
-                            
-                            // Try to trigger any embedded service events
-                            var event = new Event('embeddedservice:show');
-                            document.dispatchEvent(event);
-                            
-                            // Also try messaging API if available
-                            if (window.embeddedservice && window.embeddedservice.messaging) {
-                                window.embeddedservice.messaging.show();
-                            }
-                        }
-                    }, 500);
+                        }, 300);
+                    }
                 }
-            }, 100);
+                
+                // Hide button if found
+                if (button) {
+                    button.style.display = 'none';
+                }
+            }, 200);
             
-            // Stop checking after 10 seconds
+            // Stop checking after 15 seconds
             setTimeout(function() {
                 clearInterval(checkInterval);
-            }, 10000);
+            }, 15000);
         } catch (err) {
             console.error('Error loading Embedded Messaging: ', err);
         }

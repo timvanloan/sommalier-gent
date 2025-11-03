@@ -67,27 +67,24 @@ body {
     position: relative;
 }
 
-/* Hide the floating button completely */
-.embeddedServiceHelpButton {
+/* Hide the floating button completely - everywhere */
+.embeddedServiceHelpButton,
+.embeddedServiceIcon,
+button[aria-label*="chat"],
+button[aria-label*="Chat"] {
     display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
 }
 
-/* Style the sidebar to fill the modal */
-.embeddedServiceSidebar {
-    position: relative !important;
-    width: 100% !important;
-    height: 100% !important;
-    max-width: 100% !important;
-    max-height: 100% !important;
-    margin: 0 !important;
-    border-radius: 15px !important;
-    box-shadow: none !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+/* Force ALL sidebar instances to be hidden unless in our modal */
+.embeddedServiceSidebar:not(.embedded-in-modal) {
+    display: none !important;
+    visibility: hidden !important;
 }
 
-/* When sidebar is inside our modal, make it fill the container */
+/* Style the sidebar when embedded in modal */
+.embeddedServiceSidebar.embedded-in-modal,
 #embedded-messaging-agent .embeddedServiceSidebar {
     position: absolute !important;
     top: 0 !important;
@@ -96,16 +93,36 @@ body {
     bottom: 0 !important;
     width: 100% !important;
     height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
     border-radius: 15px !important;
+    box-shadow: none !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 1001 !important;
+    transform: none !important;
 }
 
 /* Style iframe inside sidebar */
 .embeddedServiceSidebar iframe,
+.embeddedServiceSidebar.embedded-in-modal iframe,
 #embedded-messaging-agent .embeddedServiceSidebar iframe {
     width: 100% !important;
     height: 100% !important;
     border-radius: 15px !important;
     border: none !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+}
+
+/* Hide any wrapper containers that might be positioning the sidebar */
+.embeddedServiceSidebar + *,
+* > .embeddedServiceSidebar:not(.embedded-in-modal) {
+    display: none !important;
 }
 
 /* Style Agentforce widget container */
