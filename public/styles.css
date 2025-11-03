@@ -74,6 +74,11 @@ body {
     opacity: 0 !important;
 }
 
+/* Make the entire embedded messaging agent container semi-transparent */
+#embedded-messaging-agent {
+    opacity: 0.5 !important;
+}
+
 /* Force sidebar to be positioned in our modal if it exists */
 .embeddedServiceSidebar {
     position: absolute !important;
@@ -86,7 +91,6 @@ body {
     border-radius: 15px !important;
     overflow: hidden !important;
     z-index: 1001 !important;
-    opacity: 0.5 !important;
 }
 
 /* When sidebar is in our modal container, ensure it fills */
@@ -100,7 +104,6 @@ body {
     height: 100% !important;
     border-radius: 15px !important;
     overflow: hidden !important;
-    opacity: 0.5 !important;
 }
 
 /* Style the embedded messaging container when it's in our modal */
@@ -115,12 +118,6 @@ body {
     height: 100% !important;
     border-radius: 15px !important;
     overflow: hidden !important;
-    opacity: 0.5 !important;
-}
-
-/* Make the entire embedded messaging agent container semi-transparent */
-#embedded-messaging-agent {
-    opacity: 0.5 !important;
 }
 
 /* Style iframe inside the embedded messaging */
