@@ -55,9 +55,9 @@
             embeddedservice_bootstrap.settings.targetElement = targetContainer;
             
             // Set widget font size
-            if (embeddedservice_bootstrap.settings) {
+          
                 embeddedservice_bootstrap.settings.widgetFontSize = '40px';
-            }
+            
             
             // Auto-launch the chat immediately
             setTimeout(function() {
@@ -88,9 +88,9 @@
         }
         
         // Hide button
-        if (button) {
-            button.style.display = 'none';
-        }
+       // if (button) {
+        //    button.style.display = 'none';
+       // }
         
         // Stop checking after widget is found and moved
         if (sidebar && targetContainer.contains(sidebar)) {
