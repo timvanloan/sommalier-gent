@@ -63,12 +63,10 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 5vh;
 }
 
 @media (max-height: 800px) {
     .modal-container {
-        margin-top: 8vh;
         height: 75vh;
         max-height: 600px;
     }
