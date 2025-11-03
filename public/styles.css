@@ -11,6 +11,31 @@ body {
     width: 100vw;
 }
 
+.page-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 20px 20px;
+    pointer-events: none;
+}
+
+.header-title {
+    font-family: 'Georgia', 'Times New Roman', 'Palatino', 'Book Antiqua', serif;
+    font-size: 3.5rem;
+    font-weight: 400;
+    color: #722F37;
+    text-align: center;
+    letter-spacing: 0.05em;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin: 0;
+    line-height: 1.2;
+}
+
 .background-container {
     position: fixed;
     top: 0;
@@ -130,6 +155,11 @@ body {
 
 /* Responsive adjustments for mobile */
 @media (max-width: 768px) {
+    .header-title {
+        font-size: 2.5rem;
+        padding: 0 10px;
+    }
+    
     .modal-container {
         width: 95%;
         height: 85vh;
@@ -143,6 +173,11 @@ body {
 }
 
 @media (max-width: 480px) {
+    .header-title {
+        font-size: 1.8rem;
+        padding: 0 10px;
+    }
+    
     .modal-container {
         width: 100%;
         height: 100vh;
