@@ -71,10 +71,37 @@ body {
 .embeddedServiceHelpButton {
     display: none !important;
     visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+/* Force sidebar to be positioned in our modal if it exists */
+.embeddedServiceSidebar {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 15px !important;
+    overflow: hidden !important;
+    z-index: 1001 !important;
+}
+
+/* When sidebar is in our modal container, ensure it fills */
+#embedded-messaging-agent .embeddedServiceSidebar {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 15px !important;
+    overflow: hidden !important;
 }
 
 /* Style the embedded messaging container when it's in our modal */
-#embedded-messaging-agent .embeddedServiceSidebar,
 #embedded-messaging-agent .embeddedService,
 #embedded-messaging-agent .esw-overlay-container {
     position: absolute !important;
@@ -89,11 +116,15 @@ body {
 }
 
 /* Style iframe inside the embedded messaging */
-#embedded-messaging-agent iframe {
+#embedded-messaging-agent iframe,
+.embeddedServiceSidebar iframe {
     width: 100% !important;
     height: 100% !important;
     border-radius: 15px !important;
     border: none !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
 }
 
 /* Responsive adjustments for mobile */

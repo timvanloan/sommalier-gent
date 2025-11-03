@@ -20,8 +20,15 @@
 
     <!-- Agentforce Bootstrap Script -->
     <script type='text/javascript'>
+    var targetContainer = document.getElementById('embedded-messaging-agent');
+    
     function initEmbeddedMessaging() {
         try {
+            // Set target element BEFORE init
+            if (targetContainer && window.embeddedservice_bootstrap) {
+                embeddedservice_bootstrap.settings.targetElement = targetContainer;
+            }
+            
             embeddedservice_bootstrap.settings.language = 'en_US';
             
             embeddedservice_bootstrap.init(
@@ -37,9 +44,8 @@
         }
     }
     
-    // Set target element when embedded messaging is ready
+    // Set target element when embedded messaging is ready (backup)
     window.addEventListener("onEmbeddedMessagingReady", function() {
-        var targetContainer = document.getElementById('embedded-messaging-agent');
         if (targetContainer && window.embeddedservice_bootstrap) {
             embeddedservice_bootstrap.settings.targetElement = targetContainer;
             
@@ -51,6 +57,41 @@
             }, 500);
         }
     });
+    
+    // Also try to catch and move the widget if it appears elsewhere
+    var widgetChecker = setInterval(function() {
+        var sidebar = document.querySelector('.embeddedServiceSidebar');
+        var button = document.querySelector('.embeddedServiceHelpButton');
+        
+        if (sidebar && targetContainer) {
+            // Check if sidebar is already in our container
+            if (!targetContainer.contains(sidebar)) {
+                // Move it to our container
+                try {
+                    sidebar.remove();
+                    targetContainer.appendChild(sidebar);
+                    console.log('Moved sidebar to modal container');
+                } catch (err) {
+                    console.error('Error moving sidebar:', err);
+                }
+            }
+        }
+        
+        // Hide button
+        if (button) {
+            button.style.display = 'none';
+        }
+        
+        // Stop checking after widget is found and moved
+        if (sidebar && targetContainer.contains(sidebar)) {
+            clearInterval(widgetChecker);
+        }
+    }, 200);
+    
+    // Stop checking after 10 seconds
+    setTimeout(function() {
+        clearInterval(widgetChecker);
+    }, 10000);
     </script>
     <script type='text/javascript' src='https://storm-11c5bf736713cf.my.site.com/ESWSommalierGent1762152842517/assets/js/bootstrap.min.js' onload='initEmbeddedMessaging()'></script>
 </body>
