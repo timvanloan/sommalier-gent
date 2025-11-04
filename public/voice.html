@@ -13,6 +13,8 @@
             justify-content: center;
             height: 100%;
             gap: 30px;
+            position: relative;
+            z-index: 1002;
         }
 
         .voice-button {
@@ -69,6 +71,8 @@
             border-radius: 15px;
             margin-bottom: 20px;
             display: none;
+            position: relative;
+            z-index: 1002;
         }
 
         .conversation-log.show {
@@ -104,6 +108,22 @@
             color: white;
             cursor: pointer;
             font-size: 14px;
+            z-index: 1002;
+        }
+
+        /* Hide the embedded agent visually but keep it functional */
+        #embedded-messaging-agent {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+        }
+
+        #embedded-messaging-agent iframe {
+            width: 1px !important;
+            height: 1px !important;
         }
     </style>
 </head>
@@ -114,6 +134,9 @@
     
     <div class="modal-container" id="agentModal">
         <div class="modal-content">
+            <!-- Hidden Salesforce Agentforce Agent -->
+            <div id="embedded-messaging-agent"></div>
+            
             <button class="toggle-log" onclick="toggleConversationLog()">Toggle Log</button>
             
             <div class="conversation-log" id="conversationLog"></div>
@@ -122,16 +145,91 @@
                 <button class="voice-button" id="voiceButton" onclick="toggleVoiceInteraction()">
                     🎤
                 </button>
-                <div class="status-text" id="statusText">Click the microphone to start</div>
+                <div class="status-text" id="statusText">Initializing agent... Click the microphone to start</div>
             </div>
         </div>
     </div>
 
+    <!-- Agentforce Bootstrap Script -->
+    <script type='text/javascript'>
+    var targetContainer = document.getElementById('embedded-messaging-agent');
+    var agentReady = false;
+    var lastMessageCount = 0;
+    
+    function initEmbeddedMessaging() {
+        try {
+            // Set target element BEFORE init
+            if (targetContainer && window.embeddedservice_bootstrap) {
+                embeddedservice_bootstrap.settings.targetElement = targetContainer;
+            }
+            
+            embeddedservice_bootstrap.settings.language = 'en_US';
+            embeddedservice_bootstrap.settings.widgetFontSize = "40px";
+            
+            embeddedservice_bootstrap.init(
+                '00DHu00000izUN6',
+                'SommalierGent_1',
+                'https://storm-11c5bf736713cf.my.site.com/ESWSommalierGent1762152842517',
+                {
+                    scrt2URL: 'https://storm-11c5bf736713cf.my.salesforce-scrt.com'
+            });
+        } catch (err) {
+            console.error('Error loading Embedded Messaging: ', err);
+        }
+    }
+    
+    // Set target element when embedded messaging is ready
+    window.addEventListener("onEmbeddedMessagingReady", function() {
+        if (targetContainer && window.embeddedservice_bootstrap) {
+            embeddedservice_bootstrap.settings.targetElement = targetContainer;
+            embeddedservice_bootstrap.settings.widgetFontSize = "40px";
+            
+            // Auto-launch the chat immediately
+            setTimeout(function() {
+                if (embeddedservice_bootstrap.utilAPI && embeddedservice_bootstrap.utilAPI.launchChat) {
+                    embeddedservice_bootstrap.utilAPI.launchChat();
+                    agentReady = true;
+                    document.getElementById('statusText').textContent = 'Agent ready! Click the microphone to start';
+                }
+            }, 1000);
+        }
+    });
+
+    // Also try to catch and move the widget if it appears elsewhere
+    var widgetChecker = setInterval(function() {
+        var sidebar = document.querySelector('.embeddedServiceSidebar');
+        
+        if (sidebar && targetContainer) {
+            if (!targetContainer.contains(sidebar)) {
+                try {
+                    sidebar.remove();
+                    targetContainer.appendChild(sidebar);
+                    console.log('Moved sidebar to container');
+                    agentReady = true;
+                } catch (err) {
+                    console.error('Error moving sidebar:', err);
+                }
+            }
+        }
+        
+        if (sidebar && targetContainer.contains(sidebar)) {
+            clearInterval(widgetChecker);
+            agentReady = true;
+            document.getElementById('statusText').textContent = 'Agent ready! Click the microphone to start';
+        }
+    }, 200);
+    
+    setTimeout(function() {
+        clearInterval(widgetChecker);
+    }, 10000);
+    </script>
+    <script type='text/javascript' src='https://storm-11c5bf736713cf.my.site.com/ESWSommalierGent1762152842517/assets/js/bootstrap.min.js' onload='initEmbeddedMessaging()'></script>
+
     <script>
         let isListening = false;
         let recognition = null;
-        let conversationHistory = [];
         let isProcessing = false;
+        let messageObserver = null;
 
         // Initialize speech recognition
         function initSpeechRecognition() {
@@ -151,7 +249,7 @@
                 recognition.onresult = function(event) {
                     const transcript = event.results[0][0].transcript;
                     addMessage('user', transcript);
-                    sendToOpenAI(transcript);
+                    sendToAgentforce(transcript);
                 };
 
                 recognition.onerror = function(event) {
@@ -165,7 +263,7 @@
                     isListening = false;
                     if (!isProcessing) {
                         updateUI('idle');
-                        document.getElementById('statusText').textContent = 'Click the microphone to start';
+                        document.getElementById('statusText').textContent = 'Click the microphone to continue';
                     }
                 };
             } else {
@@ -174,6 +272,11 @@
         }
 
         function toggleVoiceInteraction() {
+            if (!agentReady) {
+                document.getElementById('statusText').textContent = 'Please wait for agent to initialize...';
+                return;
+            }
+
             if (isProcessing) {
                 return;
             }
@@ -197,42 +300,207 @@
             }
         }
 
-        async function sendToOpenAI(userMessage) {
+        function sendToAgentforce(userMessage) {
             isProcessing = true;
             updateUI('processing');
-            document.getElementById('statusText').textContent = 'Processing...';
+            document.getElementById('statusText').textContent = 'Sending to agent...';
 
             try {
-                const response = await fetch('/api/voice-chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        message: userMessage,
-                        history: conversationHistory
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('API request failed');
+                // Method 1: Try using Embedded Service API if available
+                if (window.embeddedservice_bootstrap && window.embeddedservice_bootstrap.utilAPI) {
+                    // Try to send message via API
+                    if (window.embeddedservice_bootstrap.utilAPI.sendMessage) {
+                        window.embeddedservice_bootstrap.utilAPI.sendMessage(userMessage);
+                        startMonitoringAgentResponse();
+                        return;
+                    }
                 }
 
-                const data = await response.json();
-                const assistantMessage = data.response;
+                // Method 2: Try to interact with iframe directly
+                const iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
                 
-                conversationHistory.push({ role: 'user', content: userMessage });
-                conversationHistory.push({ role: 'assistant', content: assistantMessage });
-                
-                addMessage('assistant', assistantMessage);
-                speakText(assistantMessage);
+                if (iframe) {
+                    // Try postMessage first (most reliable for cross-origin)
+                    iframe.contentWindow.postMessage({
+                        type: 'sendMessage',
+                        message: userMessage,
+                        action: 'send'
+                    }, '*');
+                    
+                    // Also try direct DOM manipulation if same-origin
+                    setTimeout(() => {
+                        try {
+                            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                            const inputSelector = 'input[type="text"], textarea, [contenteditable="true"], [role="textbox"]';
+                            const inputField = iframeDoc.querySelector(inputSelector);
+                            
+                            if (inputField) {
+                                // Set the value
+                                if (inputField.tagName === 'INPUT' || inputField.tagName === 'TEXTAREA') {
+                                    inputField.value = userMessage;
+                                    inputField.focus();
+                                } else {
+                                    inputField.textContent = userMessage;
+                                    inputField.focus();
+                                }
+                                
+                                // Trigger events
+                                ['input', 'change', 'keyup'].forEach(eventType => {
+                                    const event = new Event(eventType, { bubbles: true });
+                                    inputField.dispatchEvent(event);
+                                });
+                                
+                                // Try to submit
+                                setTimeout(() => {
+                                    const sendButton = iframeDoc.querySelector('button[type="submit"], button[aria-label*="Send"], button[aria-label*="send"], .send-button, [class*="send"], [data-action="send"]');
+                                    if (sendButton) {
+                                        sendButton.click();
+                                    } else {
+                                        // Try Enter key
+                                        const enterEvent = new KeyboardEvent('keydown', {
+                                            key: 'Enter',
+                                            code: 'Enter',
+                                            keyCode: 13,
+                                            which: 13,
+                                            bubbles: true,
+                                            cancelable: true
+                                        });
+                                        inputField.dispatchEvent(enterEvent);
+                                        
+                                        const enterPress = new KeyboardEvent('keypress', {
+                                            key: 'Enter',
+                                            code: 'Enter',
+                                            keyCode: 13,
+                                            which: 13,
+                                            bubbles: true,
+                                            cancelable: true
+                                        });
+                                        inputField.dispatchEvent(enterPress);
+                                    }
+                                    
+                                    startMonitoringAgentResponse();
+                                }, 300);
+                            } else {
+                                startMonitoringAgentResponse();
+                            }
+                        } catch (err) {
+                            console.log('Cross-origin iframe, using postMessage only:', err);
+                            startMonitoringAgentResponse();
+                        }
+                    }, 500);
+                    
+                    startMonitoringAgentResponse();
+                } else {
+                    console.error('Could not find agent iframe');
+                    document.getElementById('statusText').textContent = 'Error: Agent not loaded';
+                    isProcessing = false;
+                    updateUI('idle');
+                }
             } catch (error) {
                 console.error('Error:', error);
                 document.getElementById('statusText').textContent = 'Error: ' + error.message;
-                updateUI('idle');
-            } finally {
                 isProcessing = false;
+                updateUI('idle');
             }
+        }
+
+        let responseCheckInterval = null;
+        let lastResponseText = '';
+
+        function startMonitoringAgentResponse() {
+            // Clear any existing interval
+            if (responseCheckInterval) {
+                clearInterval(responseCheckInterval);
+            }
+
+            // Monitor the chat for new messages from the agent
+            responseCheckInterval = setInterval(() => {
+                try {
+                    const iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
+                    if (iframe) {
+                        try {
+                            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                            // Try multiple selectors for chat messages
+                            const messageSelectors = [
+                                '[class*="message"]',
+                                '[class*="Message"]',
+                                '.chat-message',
+                                '[role="article"]',
+                                '[class*="bubble"]',
+                                '[class*="Bubble"]',
+                                '[data-testid*="message"]'
+                            ];
+                            
+                            let messages = [];
+                            messageSelectors.forEach(selector => {
+                                const found = iframeDoc.querySelectorAll(selector);
+                                if (found.length > 0) {
+                                    messages = Array.from(found);
+                                }
+                            });
+                            
+                            if (messages.length > 0) {
+                                // Get the last message
+                                const lastMessage = messages[messages.length - 1];
+                                const messageText = (lastMessage.textContent || lastMessage.innerText).trim();
+                                
+                                // Check if it's a new response from the agent
+                                if (messageText && messageText !== lastResponseText && messageText.length > 10) {
+                                    // Check if it's not a user message (user messages often have different styling)
+                                    const isUserMessage = lastMessage.classList.contains('user') || 
+                                                         lastMessage.classList.contains('sent') ||
+                                                         lastMessage.querySelector('[class*="user"]') ||
+                                                         lastMessage.getAttribute('data-sender') === 'user';
+                                    
+                                    if (!isUserMessage) {
+                                        clearInterval(responseCheckInterval);
+                                        responseCheckInterval = null;
+                                        lastResponseText = messageText;
+                                        addMessage('assistant', messageText);
+                                        speakText(messageText);
+                                        isProcessing = false;
+                                        return;
+                                    }
+                                }
+                            }
+                        } catch (err) {
+                            // Cross-origin - monitor parent container for changes
+                            const sidebar = document.querySelector('.embeddedServiceSidebar');
+                            if (sidebar) {
+                                const sidebarText = sidebar.textContent || sidebar.innerText;
+                                if (sidebarText && sidebarText !== lastResponseText && sidebarText.length > lastResponseText.length + 20) {
+                                    // Extract potential new message
+                                    const newText = sidebarText.substring(lastResponseText.length).trim();
+                                    if (newText.length > 10) {
+                                        clearInterval(responseCheckInterval);
+                                        responseCheckInterval = null;
+                                        lastResponseText = sidebarText;
+                                        addMessage('assistant', newText);
+                                        speakText(newText);
+                                        isProcessing = false;
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.log('Monitoring for agent response...', err);
+                }
+            }, 1000);
+
+            // Stop monitoring after 30 seconds
+            setTimeout(() => {
+                if (responseCheckInterval) {
+                    clearInterval(responseCheckInterval);
+                    responseCheckInterval = null;
+                }
+                if (isProcessing) {
+                    document.getElementById('statusText').textContent = 'No response received. Try clicking the microphone again.';
+                    isProcessing = false;
+                    updateUI('idle');
+                }
+            }, 30000);
         }
 
         function speakText(text) {
@@ -298,9 +566,21 @@
 
         // Initialize on page load
         window.addEventListener('load', function() {
-            initSpeechRecognition();
+            // Wait for agent to be ready before initializing speech recognition
+            setTimeout(() => {
+                if (agentReady) {
+                    initSpeechRecognition();
+                } else {
+                    // Check again after a delay
+                    const checkReady = setInterval(() => {
+                        if (agentReady) {
+                            initSpeechRecognition();
+                            clearInterval(checkReady);
+                        }
+                    }, 500);
+                }
+            }, 2000);
         });
     </script>
 </body>
 </html>
-
