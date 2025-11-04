@@ -361,23 +361,57 @@
         clearInterval(widgetChecker);
     }, 10000);
 
+    var welcomeCaptured = false;
+    
     function captureInitialWelcome() {
+        if (welcomeCaptured) return;
+        
         const sidebar = document.querySelector('.embeddedServiceSidebar');
-        if (!sidebar) return;
-        
-        const text = (sidebar.textContent || sidebar.innerText || '').trim();
-        const filteredText = text
-            .replace(/Type your message/gi, '')
-            .replace(/Send/gi, '')
-            .replace(/Enter your message/gi, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-        
-        const words = filteredText.split(/\s+/).filter(w => w.length > 0);
-        if (filteredText.length > 10 && words.length >= 3) {
-            addMessage('assistant', filteredText);
-            speakWithOpenAI(filteredText);
+        if (!sidebar) {
+            // Retry after a delay
+            setTimeout(captureInitialWelcome, 1000);
+            return;
         }
+        
+        const checkWelcome = () => {
+            const text = (sidebar.textContent || sidebar.innerText || '').trim();
+            const filteredText = text
+                .replace(/Type your message/gi, '')
+                .replace(/Send/gi, '')
+                .replace(/Enter your message/gi, '')
+                .replace(/Click to start/gi, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+            
+            const words = filteredText.split(/\s+/).filter(w => w.length > 0);
+            if (filteredText.length > 10 && words.length >= 3 && !welcomeCaptured) {
+                welcomeCaptured = true;
+                console.log('Welcome message captured:', filteredText.substring(0, 150));
+                addMessage('assistant', filteredText);
+                setTimeout(() => {
+                    speakWithOpenAI(filteredText);
+                }, 1000);
+            }
+        };
+        
+        // Check immediately
+        checkWelcome();
+        
+        // Also observe for changes
+        const welcomeObserver = new MutationObserver(() => {
+            checkWelcome();
+        });
+        
+        welcomeObserver.observe(sidebar, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+        
+        // Stop after 15 seconds
+        setTimeout(() => {
+            welcomeObserver.disconnect();
+        }, 15000);
     }
     </script>
     <script type='text/javascript' src='https://storm-11c5bf736713cf.my.site.com/ESWSommalierGent1762152842517/assets/js/bootstrap.min.js' onload='initEmbeddedMessaging()'></script>
@@ -481,13 +515,12 @@
             document.getElementById('statusText').textContent = 'Processing...';
             document.getElementById('transcriptPreview').textContent = '';
 
-            // Reset baseline
-            setTimeout(() => {
-                const sidebar = document.querySelector('.embeddedServiceSidebar');
-                if (sidebar) {
-                    lastFullText = (sidebar.textContent || sidebar.innerText || '').trim();
-                }
-            }, 1500);
+            // Get current baseline BEFORE sending message
+            const sidebar = document.querySelector('.embeddedServiceSidebar');
+            if (sidebar) {
+                lastFullText = (sidebar.textContent || sidebar.innerText || '').trim();
+                console.log('Baseline set before sending:', lastFullText.substring(0, 100));
+            }
 
             try {
                 const iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
@@ -571,23 +604,42 @@
                 responseObserver = null;
             }
 
+            // Wait a moment for message to be sent, then set a more accurate baseline
+            setTimeout(() => {
+                if (sidebar) {
+                    const currentText = (sidebar.textContent || sidebar.innerText || '').trim();
+                    // Only update if text has grown (user message was added)
+                    if (currentText.length >= lastFullText.length) {
+                        lastFullText = currentText;
+                        console.log('Updated baseline after send:', lastFullText.substring(0, 100));
+                    }
+                }
+            }, 2000);
+
             // Create observer
             if (sidebar) {
                 responseObserver = new MutationObserver(() => {
                     const currentText = (sidebar.textContent || sidebar.innerText || '').trim();
                     
-                    if (currentText && currentText.length > lastFullText.length + 10) {
+                    // More lenient detection - check if text has grown
+                    if (currentText && currentText.length > lastFullText.length + 5) {
                         const newText = currentText.substring(lastFullText.length).trim();
                         const filteredText = newText
                             .replace(/Type your message/gi, '')
                             .replace(/Send/gi, '')
                             .replace(/Enter your message/gi, '')
+                            .replace(/Click to start/gi, '')
                             .replace(/\s+/g, ' ')
                             .trim();
                         
                         const words = filteredText.split(/\s+/).filter(w => w.length > 0);
-                        if (filteredText.length > 10 && words.length >= 2) {
+                        console.log('Mutation detected - new text:', filteredText.substring(0, 100), 'Words:', words.length);
+                        
+                        // More lenient: accept 2+ words or 10+ characters
+                        if (filteredText.length >= 10 && words.length >= 2) {
                             lastFullText = currentText;
+                            
+                            console.log('Response captured via MutationObserver:', filteredText.substring(0, 150));
                             
                             if (responseObserver) {
                                 responseObserver.disconnect();
@@ -608,30 +660,35 @@
                 });
             }
 
-            // Polling fallback
+            // Polling fallback - check more frequently
             let pollCount = 0;
             const pollInterval = setInterval(() => {
                 pollCount++;
                 
                 if (sidebar) {
                     const currentFullText = (sidebar.textContent || sidebar.innerText || '').trim();
-                    if (currentFullText.length > lastFullText.length + 10) {
+                    if (currentFullText.length > lastFullText.length + 5) {
                         const newText = currentFullText.substring(lastFullText.length).trim();
                         const filteredText = newText
                             .replace(/Type your message/gi, '')
                             .replace(/Send/gi, '')
                             .replace(/Enter your message/gi, '')
+                            .replace(/Click to start/gi, '')
                             .replace(/\s+/g, ' ')
                             .trim();
                         
                         const words = filteredText.split(/\s+/).filter(w => w.length > 0);
-                        if (filteredText.length > 10 && words.length >= 2) {
+                        console.log('Polling check - new text:', filteredText.substring(0, 100), 'Words:', words.length);
+                        
+                        if (filteredText.length >= 10 && words.length >= 2) {
                             lastFullText = currentFullText;
                             clearInterval(pollInterval);
                             if (responseObserver) {
                                 responseObserver.disconnect();
                                 responseObserver = null;
                             }
+                            
+                            console.log('Response captured via polling:', filteredText.substring(0, 150));
                             addMessage('assistant', filteredText);
                             speakWithOpenAI(filteredText);
                             isProcessing = false;
@@ -640,13 +697,15 @@
                     }
                 }
                 
-                if (pollCount > 45) {
+                // Extended timeout to 60 seconds
+                if (pollCount > 60) {
                     clearInterval(pollInterval);
                     if (responseObserver) {
                         responseObserver.disconnect();
                         responseObserver = null;
                     }
                     if (isProcessing) {
+                        console.log('Timeout - no response detected. Last text:', lastFullText.substring(0, 100));
                         document.getElementById('statusText').textContent = 'No response - try again';
                         isProcessing = false;
                         updateUI('idle');
