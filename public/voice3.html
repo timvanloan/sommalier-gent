@@ -206,7 +206,7 @@
             font-style: italic;
         }
 
-        /* Hide agent but keep it functional */
+        /* Make agent visible but behind voice controls */
         #embedded-messaging-agent {
             position: absolute;
             top: 0;
@@ -214,37 +214,25 @@
             width: 100%;
             height: 100%;
             z-index: 1;
-            opacity: 0;
-            pointer-events: none !important;
+            opacity: 0.4;
+            pointer-events: auto !important;
         }
 
         #embedded-messaging-agent * {
-            pointer-events: none !important;
+            pointer-events: auto !important;
         }
 
         #embedded-messaging-agent iframe {
             width: 100% !important;
             height: 100% !important;
-            pointer-events: none !important;
-        }
-
-        /* Temporarily enable pointer events for interaction */
-        #embedded-messaging-agent.interactive,
-        #embedded-messaging-agent.interactive * {
             pointer-events: auto !important;
         }
 
         .embeddedServiceSidebar {
-            pointer-events: none !important;
+            pointer-events: auto !important;
         }
 
         .embeddedServiceSidebar * {
-            pointer-events: none !important;
-        }
-
-        /* Enable sidebar when needed for interaction */
-        .embeddedServiceSidebar.interactive,
-        .embeddedServiceSidebar.interactive * {
             pointer-events: auto !important;
         }
 
@@ -562,83 +550,46 @@
             // Show user message in our UI
             addMessage('user', userMessage);
             
-            // Make agent visible and interactive temporarily
+            // Copy message to clipboard so user can paste it
+            try {
+                await navigator.clipboard.writeText(userMessage);
+                console.log('Message copied to clipboard');
+            } catch (err) {
+                console.log('Clipboard not available:', err);
+            }
+            
+            // Make agent more visible temporarily and show instructions
             const agentContainer = document.getElementById('embedded-messaging-agent');
             const sidebarEl = document.querySelector('.embeddedServiceSidebar');
             
             if (agentContainer && sidebarEl) {
-                // Make agent visible and interactive
-                agentContainer.classList.add('interactive');
-                sidebarEl.classList.add('interactive');
-                agentContainer.style.opacity = '0.5';
+                // Make agent more visible
+                agentContainer.style.opacity = '0.7';
                 
-                // Try to find and interact with input field using more aggressive selectors
+                // Try to focus the agent iframe
+                const iframe = agentContainer.querySelector('iframe');
+                if (iframe) {
+                    try {
+                        iframe.focus();
+                    } catch (e) {
+                        console.log('Cannot focus iframe:', e);
+                    }
+                }
+                
+                // Show instruction
+                document.getElementById('statusText').textContent = 'Click in the agent chat below and paste your message (Ctrl+V / Cmd+V)';
+                
+                // Auto-hide instruction after 10 seconds
                 setTimeout(() => {
-                    // Try multiple ways to find input
-                    const allInputs = sidebarEl.querySelectorAll('input, textarea, [contenteditable], [role="textbox"]');
-                    console.log('Found inputs:', allInputs.length);
-                    
-                    let inputFound = false;
-                    
-                    for (const input of allInputs) {
-                        try {
-                            // Focus the input
-                            input.focus();
-                            
-                            // Try to set value
-                            if (input.tagName === 'INPUT' || input.tagName === 'TEXTAREA') {
-                                input.value = userMessage;
-                                input.dispatchEvent(new Event('input', { bubbles: true }));
-                                input.dispatchEvent(new Event('change', { bubbles: true }));
-                            } else {
-                                input.textContent = userMessage;
-                                input.dispatchEvent(new Event('input', { bubbles: true }));
-                            }
-                            
-                            // Try pressing Enter
-                            setTimeout(() => {
-                                const enterEvent = new KeyboardEvent('keydown', {
-                                    key: 'Enter',
-                                    code: 'Enter',
-                                    keyCode: 13,
-                                    which: 13,
-                                    bubbles: true,
-                                    cancelable: true
-                                });
-                                input.dispatchEvent(enterEvent);
-                                
-                                const enterPress = new KeyboardEvent('keypress', {
-                                    key: 'Enter',
-                                    code: 'Enter',
-                                    keyCode: 13,
-                                    which: 13,
-                                    bubbles: true,
-                                    cancelable: true
-                                });
-                                input.dispatchEvent(enterPress);
-                                
-                                console.log('Simulated Enter key on input');
-                            }, 300);
-                            
-                            inputFound = true;
-                            break;
-                        } catch (e) {
-                            console.log('Error with input:', e);
-                        }
+                    if (isProcessing) {
+                        document.getElementById('statusText').textContent = 'Waiting for agent response...';
                     }
-                    
-                    if (!inputFound) {
-                        console.log('No input found, user will need to type manually');
-                        document.getElementById('statusText').textContent = 'Please type "' + userMessage + '" in the agent chat below';
-                    }
-                    
-                    // Hide agent again after interaction attempt
-                    setTimeout(() => {
-                        agentContainer.style.opacity = '0';
-                        agentContainer.classList.remove('interactive');
-                        sidebarEl.classList.remove('interactive');
-                    }, 2000);
-                }, 500);
+                }, 10000);
+                
+                // Hide agent again after 15 seconds
+                setTimeout(() => {
+                    agentContainer.style.opacity = '0.4';
+                }, 15000);
             }
             
             // Start monitoring for response
