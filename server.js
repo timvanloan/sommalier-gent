@@ -11,7 +11,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.CHATGPT_API_KEY
+  apiKey: process.env.CHATGPT_API_KEY?.trim()
 });
 
 // Voice chat API endpoint
