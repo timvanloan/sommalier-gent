@@ -548,44 +548,119 @@
             window.lastUserMessage = userMessage;
 
             try {
-                const iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
-                
-                if (!iframe) {
-                    throw new Error('Agent iframe not found');
+                // Try using embedded service API first (if available)
+                if (window.embeddedservice_bootstrap && window.embeddedservice_bootstrap.utilAPI) {
+                    try {
+                        // Some embedded service APIs have a sendMessage method
+                        if (window.embeddedservice_bootstrap.utilAPI.sendMessage) {
+                            window.embeddedservice_bootstrap.utilAPI.sendMessage(userMessage);
+                            console.log('Message sent via embeddedservice_bootstrap.utilAPI.sendMessage');
+                            monitorAgentResponse();
+                            return;
+                        }
+                        
+                        // Try opening chat and sending via input field manipulation
+                        if (window.embeddedservice_bootstrap.utilAPI.launchChat) {
+                            window.embeddedservice_bootstrap.utilAPI.launchChat();
+                        }
+                    } catch (apiErr) {
+                        console.log('API method not available, trying alternative:', apiErr);
+                    }
                 }
-
-                // Since we can't access cross-origin iframe DOM, use postMessage
-                // This is the only reliable way to interact with cross-origin iframes
-                try {
-                    // Try postMessage first (most reliable for cross-origin)
-                    iframe.contentWindow.postMessage({
-                        type: 'sendMessage',
-                        message: userMessage
-                    }, '*');
+                
+                // Alternative: Try to find and interact with input field in sidebar
+                // The sidebar is in our origin, so we can access its DOM
+                const sidebarInput = sidebar ? sidebar.querySelector('input[type="text"], textarea, [contenteditable="true"], [role="textbox"]') : null;
+                
+                if (sidebarInput) {
+                    console.log('Found input in sidebar, attempting to send message');
+                    sidebarInput.focus();
                     
-                    // Also try multiple message formats that different agents might expect
-                    setTimeout(() => {
-                        iframe.contentWindow.postMessage({
-                            type: 'userMessage',
-                            text: userMessage,
-                            data: userMessage
-                        }, '*');
-                    }, 100);
+                    // Clear and set value
+                    if (sidebarInput.tagName === 'INPUT' || sidebarInput.tagName === 'TEXTAREA') {
+                        sidebarInput.value = '';
+                        sidebarInput.value = userMessage;
+                    } else {
+                        sidebarInput.textContent = '';
+                        sidebarInput.textContent = userMessage;
+                    }
                     
+                    // Trigger input events
+                    ['input', 'change', 'keyup'].forEach(eventType => {
+                        const event = new Event(eventType, { bubbles: true, cancelable: true });
+                        sidebarInput.dispatchEvent(event);
+                    });
+                    
+                    // Try to find and click send button
                     setTimeout(() => {
+                        const sendButton = sidebar.querySelector('button[type="submit"], button[aria-label*="Send"], button[aria-label*="send"], [class*="send"]');
+                        if (sendButton) {
+                            console.log('Found send button, clicking');
+                            sendButton.click();
+                        } else {
+                            // Try pressing Enter
+                            console.log('No send button found, simulating Enter key');
+                            const enterEvent = new KeyboardEvent('keydown', {
+                                key: 'Enter',
+                                code: 'Enter',
+                                keyCode: 13,
+                                which: 13,
+                                bubbles: true,
+                                cancelable: true
+                            });
+                            sidebarInput.dispatchEvent(enterEvent);
+                            
+                            const enterPress = new KeyboardEvent('keypress', {
+                                key: 'Enter',
+                                code: 'Enter',
+                                keyCode: 13,
+                                which: 13,
+                                bubbles: true,
+                                cancelable: true
+                            });
+                            sidebarInput.dispatchEvent(enterPress);
+                            
+                            const enterUp = new KeyboardEvent('keyup', {
+                                key: 'Enter',
+                                code: 'Enter',
+                                keyCode: 13,
+                                which: 13,
+                                bubbles: true,
+                                cancelable: true
+                            });
+                            sidebarInput.dispatchEvent(enterUp);
+                        }
+                        
+                        monitorAgentResponse();
+                    }, 500);
+                    
+                    return;
+                }
+                
+                // Fallback: Try postMessage to iframe
+                const iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
+                if (iframe) {
+                    console.log('Using postMessage fallback');
+                    try {
                         iframe.contentWindow.postMessage({
-                            action: 'send',
+                            type: 'sendMessage',
                             message: userMessage
                         }, '*');
-                    }, 200);
-                    
-                    // Start monitoring for response
-                    monitorAgentResponse();
-                    
-                } catch (err) {
-                    console.error('Error sending message:', err);
-                    // Still try to monitor - agent might have received the message
-                    monitorAgentResponse();
+                        
+                        setTimeout(() => {
+                            iframe.contentWindow.postMessage({
+                                type: 'userMessage',
+                                text: userMessage
+                            }, '*');
+                        }, 100);
+                        
+                        monitorAgentResponse();
+                    } catch (err) {
+                        console.error('Error with postMessage:', err);
+                        monitorAgentResponse();
+                    }
+                } else {
+                    throw new Error('Could not find agent interface');
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -681,6 +756,10 @@
                             .replace(/Send/gi, '')
                             .replace(/Enter your message/gi, '')
                             .replace(/Click to start/gi, '')
+                            .replace(/Processing/gi, '')
+                            .replace(/Your message/gi, '')
+                            .replace(/You said/gi, '')
+                            .replace(/Sending/gi, '')
                             .replace(/\s+/g, ' ')
                             .trim();
                         
