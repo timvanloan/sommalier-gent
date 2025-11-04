@@ -544,6 +544,9 @@
                 console.log('Baseline set before sending:', lastFullText.substring(0, 100));
             }
 
+            // Store user message for filtering
+            window.lastUserMessage = userMessage;
+
             try {
                 const iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
                 
@@ -627,14 +630,20 @@
                             .replace(/Send/gi, '')
                             .replace(/Enter your message/gi, '')
                             .replace(/Click to start/gi, '')
+                            .replace(/Processing/gi, '')
+                            .replace(/Your message/gi, '')
+                            .replace(/You said/gi, '')
                             .replace(/\s+/g, ' ')
                             .trim();
                         
                         const words = filteredText.split(/\s+/).filter(w => w.length > 0);
-                        console.log('Mutation detected - new text:', filteredText.substring(0, 100), 'Words:', words.length);
+                        console.log('Mutation detected - new text:', filteredText.substring(0, 100), 'Words:', words.length, 'Length:', filteredText.length);
                         
                         // More lenient: accept 2+ words or 10+ characters
-                        if (filteredText.length >= 10 && words.length >= 2) {
+                        // Also check that it's not just the user's message being echoed back
+                        const isUserEcho = window.lastUserMessage && filteredText.toLowerCase().includes(window.lastUserMessage.toLowerCase().substring(0, 20));
+                        
+                        if (filteredText.length >= 10 && words.length >= 2 && !isUserEcho) {
                             lastFullText = currentText;
                             
                             console.log('Response captured via MutationObserver:', filteredText.substring(0, 150));
@@ -678,7 +687,9 @@
                         const words = filteredText.split(/\s+/).filter(w => w.length > 0);
                         console.log('Polling check - new text:', filteredText.substring(0, 100), 'Words:', words.length);
                         
-                        if (filteredText.length >= 10 && words.length >= 2) {
+                        const isUserEcho = window.lastUserMessage && filteredText.toLowerCase().includes(window.lastUserMessage.toLowerCase().substring(0, 20));
+                        
+                        if (filteredText.length >= 10 && words.length >= 2 && !isUserEcho) {
                             lastFullText = currentFullText;
                             clearInterval(pollInterval);
                             if (responseObserver) {
