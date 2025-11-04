@@ -27,6 +27,10 @@ const SALESFORCE_DOMAIN_URL = process.env.SALESFORCE_DOMAIN_URL?.trim() || 'http
 const SALESFORCE_CONSUMER_KEY = process.env.SALESFORCE_CONSUMER_KEY?.trim();
 const SALESFORCE_CONSUMER_SECRET = process.env.SALESFORCE_CONSUMER_SECRET?.trim();
 const SALESFORCE_AGENT_ID = process.env.SALESFORCE_AGENT_ID?.trim() || '00DHu00000izUN6';
+// Optional: Username-Password flow (alternative to Client Credentials)
+const SALESFORCE_USERNAME = process.env.SALESFORCE_USERNAME?.trim();
+const SALESFORCE_PASSWORD = process.env.SALESFORCE_PASSWORD?.trim();
+const SALESFORCE_SECURITY_TOKEN = process.env.SALESFORCE_SECURITY_TOKEN?.trim();
 
 // Helper function to make HTTP requests
 function makeRequest(url, options = {}) {
@@ -77,11 +81,29 @@ async function getSalesforceAccessToken() {
   }
 
   const tokenUrl = `${SALESFORCE_DOMAIN_URL}/services/oauth2/token`;
-  const params = new URLSearchParams({
-    grant_type: 'client_credentials',
-    client_id: SALESFORCE_CONSUMER_KEY,
-    client_secret: SALESFORCE_CONSUMER_SECRET
-  });
+  
+  // Try Client Credentials flow first
+  let params;
+  if (SALESFORCE_USERNAME && SALESFORCE_PASSWORD) {
+    // Username-Password flow (alternative)
+    const password = SALESFORCE_PASSWORD + (SALESFORCE_SECURITY_TOKEN ? SALESFORCE_SECURITY_TOKEN : '');
+    params = new URLSearchParams({
+      grant_type: 'password',
+      client_id: SALESFORCE_CONSUMER_KEY,
+      client_secret: SALESFORCE_CONSUMER_SECRET,
+      username: SALESFORCE_USERNAME,
+      password: password
+    });
+    console.log('Trying Username-Password OAuth flow...');
+  } else {
+    // Client Credentials flow
+    params = new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: SALESFORCE_CONSUMER_KEY,
+      client_secret: SALESFORCE_CONSUMER_SECRET
+    });
+    console.log('Trying Client Credentials OAuth flow...');
+  }
 
   try {
     const response = await fetch(tokenUrl, {
