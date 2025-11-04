@@ -323,54 +323,77 @@ app.post('/api/agentforce-chat', async (req, res) => {
 
     // Try multiple API endpoint patterns
     try {
-      // Method 1: Try Agentforce API endpoint
-      const apiUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/sobjects/AgentforceConversation__c`;
-      
-      // First, create or get conversation session
+      // Method 1: Try Agentforce API endpoint (correct structure)
+      // Create session first
       let sessionId = conversationId;
       if (!sessionId) {
-        const sessionResponse = await fetch(apiUrl, {
+        const sessionUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions`;
+        const sessionUuid = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        const sessionResponse = await fetch(sessionUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            AgentforceAgent__c: SALESFORCE_AGENT_ID
+            bypassUser: true,
+            sessionKey: sessionUuid
           })
         });
 
         if (sessionResponse.ok) {
           const sessionData = await sessionResponse.json();
-          sessionId = sessionData.id;
-          console.log('Created conversation session:', sessionId);
+          sessionId = sessionData.sessionId || sessionData.id;
+          console.log('✅ Created conversation session:', sessionId);
+        } else {
+          const errorText = await sessionResponse.text();
+          console.log('Session creation failed:', sessionResponse.status, errorText);
         }
       }
 
-      // Method 2: Try direct chat endpoint
+      // Method 2: Send message using Agentforce API
       if (sessionId) {
-        const chatUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/chatbot/agents/${SALESFORCE_AGENT_ID}/sessions/${sessionId}/messages`;
+        const messageUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions/${sessionId}/messages`;
         
-        const messageResponse = await fetch(chatUrl, {
+        const messageResponse = await fetch(messageUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            text: message,
-            type: 'user'
+            input: {
+              text: message
+            }
           })
         });
 
         if (messageResponse.ok) {
           const messageData = await messageResponse.json();
+          console.log('Message sent, response:', JSON.stringify(messageData).substring(0, 200));
           
-          // Wait for agent response
+          // Agent response is typically in the same response
+          if (messageData.output && messageData.output.text) {
+            return res.json({ 
+              response: messageData.output.text,
+              conversationId: sessionId
+            });
+          }
+          
+          // Or it might be in a different field
+          if (messageData.response || messageData.message || messageData.text) {
+            return res.json({ 
+              response: messageData.response || messageData.message || messageData.text,
+              conversationId: sessionId
+            });
+          }
+          
+          // Wait and poll for response
           await new Promise(resolve => setTimeout(resolve, 3000));
           
           // Get latest messages
-          const messagesResponse = await fetch(chatUrl, {
+          const messagesResponse = await fetch(messageUrl, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
@@ -386,11 +409,11 @@ app.post('/api/agentforce-chat', async (req, res) => {
             let agentResponse = null;
             if (Array.isArray(messages)) {
               const agentMessages = messages
-                .filter(m => (m.Sender__c === 'Agent' || m.sender === 'agent' || m.role === 'assistant'))
+                .filter(m => (m.Sender__c === 'Agent' || m.sender === 'agent' || m.role === 'assistant' || m.type === 'agent'))
                 .sort((a, b) => new Date(b.CreatedDate || b.createdDate || 0) - new Date(a.CreatedDate || a.createdDate || 0));
               
               if (agentMessages.length > 0) {
-                agentResponse = agentMessages[0].Message__c || agentMessages[0].text || agentMessages[0].message || agentMessages[0].content;
+                agentResponse = agentMessages[0].Message__c || agentMessages[0].text || agentMessages[0].message || agentMessages[0].content || agentMessages[0].output?.text;
               }
             }
             
@@ -401,11 +424,14 @@ app.post('/api/agentforce-chat', async (req, res) => {
               });
             }
           }
+        } else {
+          const errorText = await messageResponse.text();
+          console.log('Message sending failed:', messageResponse.status, errorText);
         }
       }
 
       // Method 3: Try alternative endpoint structure
-      const altUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/chatbot/agents/${SALESFORCE_AGENT_ID}/chat`;
+      const altUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/agentforce/agents/${SALESFORCE_AGENT_ID}/chat`;
       const altResponse = await fetch(altUrl, {
         method: 'POST',
         headers: {
@@ -421,7 +447,7 @@ app.post('/api/agentforce-chat', async (req, res) => {
       if (altResponse.ok) {
         const altData = await altResponse.json();
         return res.json({ 
-          response: altData.response || altData.message || altData.text,
+          response: altData.response || altData.message || altData.text || altData.output?.text,
           conversationId: altData.sessionId || conversationId
         });
       }
@@ -430,7 +456,7 @@ app.post('/api/agentforce-chat', async (req, res) => {
       return res.status(500).json({ 
         error: 'Unable to communicate with Agentforce API',
         details: 'Tried multiple API endpoints but none responded successfully',
-        note: 'Please check Salesforce Agentforce API documentation for correct endpoints. You may need to use a different API version or endpoint structure.'
+        note: 'Please check Salesforce Agentforce API documentation. You may need to verify your Connected App is associated with the agent and has the correct OAuth scopes.'
       });
 
     } catch (error) {
