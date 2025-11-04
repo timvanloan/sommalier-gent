@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const OpenAI = require('openai');
+const https = require('https');
+const http = require('http');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,6 +17,224 @@ app.use(express.static(path.join(__dirname, 'public')));
 const openai = new OpenAI({
   apiKey: process.env.CHATGPT_API_KEY?.trim()
 });
+
+// Salesforce OAuth Token Cache
+let salesforceAccessToken = null;
+let tokenExpiryTime = null;
+
+// Salesforce Configuration
+const SALESFORCE_DOMAIN_URL = process.env.SALESFORCE_DOMAIN_URL?.trim() || 'https://storm-11c5bf736713cf.my.salesforce.com';
+const SALESFORCE_CONSUMER_KEY = process.env.SALESFORCE_CONSUMER_KEY?.trim();
+const SALESFORCE_CONSUMER_SECRET = process.env.SALESFORCE_CONSUMER_SECRET?.trim();
+const SALESFORCE_AGENT_ID = process.env.SALESFORCE_AGENT_ID?.trim() || '00DHu00000izUN6';
+
+// Helper function to make HTTP requests
+function makeRequest(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const requestOptions = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
+      path: urlObj.pathname + urlObj.search,
+      method: options.method || 'GET',
+      headers: options.headers || {}
+    };
+
+    const requestModule = urlObj.protocol === 'https:' ? https : http;
+    
+    const req = requestModule.request(requestOptions, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          resolve({ status: res.statusCode, data: parsed });
+        } catch (e) {
+          resolve({ status: res.statusCode, data: data });
+        }
+      });
+    });
+
+    req.on('error', reject);
+    
+    if (options.body) {
+      req.write(typeof options.body === 'string' ? options.body : JSON.stringify(options.body));
+    }
+    
+    req.end();
+  });
+}
+
+// Get Salesforce OAuth Access Token
+async function getSalesforceAccessToken() {
+  // Check if we have a valid cached token
+  if (salesforceAccessToken && tokenExpiryTime && Date.now() < tokenExpiryTime) {
+    return salesforceAccessToken;
+  }
+
+  if (!SALESFORCE_CONSUMER_KEY || !SALESFORCE_CONSUMER_SECRET) {
+    throw new Error('Salesforce credentials not configured. Please set SALESFORCE_CONSUMER_KEY and SALESFORCE_CONSUMER_SECRET environment variables.');
+  }
+
+  const tokenUrl = `${SALESFORCE_DOMAIN_URL}/services/oauth2/token`;
+  const params = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: SALESFORCE_CONSUMER_KEY,
+    client_secret: SALESFORCE_CONSUMER_SECRET
+  });
+
+  try {
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: params.toString()
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OAuth token request failed: ${response.status} ${errorText}`);
+    }
+
+    const tokenData = await response.json();
+    salesforceAccessToken = tokenData.access_token;
+    // Set expiry time (usually expires in 2 hours, use 1.5 hours for safety)
+    tokenExpiryTime = Date.now() + (tokenData.expires_in - 1800) * 1000;
+    
+    console.log('✅ Salesforce OAuth token obtained successfully');
+    return salesforceAccessToken;
+  } catch (error) {
+    console.error('❌ Error getting Salesforce access token:', error);
+    throw error;
+  }
+}
+
+// Create Agentforce conversation session
+async function createConversationSession(accessToken) {
+  const apiUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/sobjects/AgentforceConversation__c`;
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        AgentforceAgent__c: SALESFORCE_AGENT_ID
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create conversation: ${response.status} ${errorText}`);
+    }
+
+    const sessionData = await response.json();
+    return sessionData.id; // Conversation session ID
+  } catch (error) {
+    console.error('Error creating conversation session:', error);
+    throw error;
+  }
+}
+
+// Send message to Agentforce agent
+async function sendMessageToAgent(accessToken, conversationId, message) {
+  // Try Agentforce API endpoint
+  const apiUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/sobjects/AgentforceMessage__c`;
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        Conversation__c: conversationId,
+        Message__c: message,
+        Sender__c: 'User'
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      // If this endpoint doesn't work, try alternative API
+      console.log('Standard API failed, trying alternative...');
+      return await sendMessageToAgentAlternative(accessToken, conversationId, message);
+    }
+
+    const messageData = await response.json();
+    return messageData;
+  } catch (error) {
+    console.error('Error sending message:', error);
+    return await sendMessageToAgentAlternative(accessToken, conversationId, message);
+  }
+}
+
+// Alternative method using Agentforce REST API
+async function sendMessageToAgentAlternative(accessToken, conversationId, message) {
+  // Try the Agentforce API endpoint
+  const apiUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/chatbot/agents/${SALESFORCE_AGENT_ID}/sessions/${conversationId}/messages`;
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        text: message
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to send message: ${response.status} ${errorText}`);
+    }
+
+    const responseData = await response.json();
+    return responseData;
+  } catch (error) {
+    console.error('Alternative API also failed:', error);
+    throw error;
+  }
+}
+
+// Get agent response
+async function getAgentResponse(accessToken, conversationId) {
+  // Poll for response
+  const apiUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/chatbot/agents/${SALESFORCE_AGENT_ID}/sessions/${conversationId}/messages`;
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to get response: ${response.status} ${errorText}`);
+    }
+
+    const messages = await response.json();
+    // Get the last message from the agent
+    const agentMessages = messages.records || messages || [];
+    const lastAgentMessage = Array.isArray(agentMessages) 
+      ? agentMessages.filter(m => m.Sender__c === 'Agent' || m.sender === 'agent').pop()
+      : null;
+    
+    return lastAgentMessage?.Message__c || lastAgentMessage?.text || lastAgentMessage?.message || null;
+  } catch (error) {
+    console.error('Error getting agent response:', error);
+    throw error;
+  }
+}
 
 // Voice chat API endpoint
 app.post('/api/voice-chat', async (req, res) => {
@@ -71,28 +291,155 @@ app.get('/voice3', (req, res) => {
 });
 
 // API endpoint to get Agentforce agent response
-// Note: This is a placeholder - you'll need to integrate with Salesforce Agentforce API
 app.post('/api/agentforce-chat', async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, conversationId } = req.body;
     
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
-    
-    // TODO: Integrate with Salesforce Agentforce API here
-    // For now, return a placeholder response indicating manual interaction is needed
-    // In a real implementation, you would:
-    // 1. Authenticate with Salesforce
-    // 2. Call Agentforce API endpoints
-    // 3. Get the agent's response
-    // 4. Return it to the client
-    
-    res.json({ 
-      message: 'Agentforce API integration needed',
-      received: message,
-      note: 'Please integrate with Salesforce Agentforce REST API to enable programmatic messaging'
-    });
+
+    // Check if credentials are configured
+    if (!SALESFORCE_CONSUMER_KEY || !SALESFORCE_CONSUMER_SECRET) {
+      return res.status(500).json({ 
+        error: 'Salesforce credentials not configured',
+        details: 'Please set SALESFORCE_CONSUMER_KEY and SALESFORCE_CONSUMER_SECRET in Heroku Config Vars',
+        note: 'You need to create a Connected App in Salesforce and get the Consumer Key and Secret'
+      });
+    }
+
+    // Get access token
+    let accessToken;
+    try {
+      accessToken = await getSalesforceAccessToken();
+    } catch (error) {
+      console.error('Authentication failed:', error);
+      return res.status(500).json({ 
+        error: 'Salesforce authentication failed',
+        details: error.message,
+        note: 'Please verify your SALESFORCE_CONSUMER_KEY and SALESFORCE_CONSUMER_SECRET are correct'
+      });
+    }
+
+    // Try multiple API endpoint patterns
+    try {
+      // Method 1: Try Agentforce API endpoint
+      const apiUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/sobjects/AgentforceConversation__c`;
+      
+      // First, create or get conversation session
+      let sessionId = conversationId;
+      if (!sessionId) {
+        const sessionResponse = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            AgentforceAgent__c: SALESFORCE_AGENT_ID
+          })
+        });
+
+        if (sessionResponse.ok) {
+          const sessionData = await sessionResponse.json();
+          sessionId = sessionData.id;
+          console.log('Created conversation session:', sessionId);
+        }
+      }
+
+      // Method 2: Try direct chat endpoint
+      if (sessionId) {
+        const chatUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/chatbot/agents/${SALESFORCE_AGENT_ID}/sessions/${sessionId}/messages`;
+        
+        const messageResponse = await fetch(chatUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            text: message,
+            type: 'user'
+          })
+        });
+
+        if (messageResponse.ok) {
+          const messageData = await messageResponse.json();
+          
+          // Wait for agent response
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // Get latest messages
+          const messagesResponse = await fetch(chatUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (messagesResponse.ok) {
+            const messagesData = await messagesResponse.json();
+            const messages = messagesData.records || messagesData.messages || messagesData || [];
+            
+            // Find the latest agent message
+            let agentResponse = null;
+            if (Array.isArray(messages)) {
+              const agentMessages = messages
+                .filter(m => (m.Sender__c === 'Agent' || m.sender === 'agent' || m.role === 'assistant'))
+                .sort((a, b) => new Date(b.CreatedDate || b.createdDate || 0) - new Date(a.CreatedDate || a.createdDate || 0));
+              
+              if (agentMessages.length > 0) {
+                agentResponse = agentMessages[0].Message__c || agentMessages[0].text || agentMessages[0].message || agentMessages[0].content;
+              }
+            }
+            
+            if (agentResponse) {
+              return res.json({ 
+                response: agentResponse,
+                conversationId: sessionId
+              });
+            }
+          }
+        }
+      }
+
+      // Method 3: Try alternative endpoint structure
+      const altUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/chatbot/agents/${SALESFORCE_AGENT_ID}/chat`;
+      const altResponse = await fetch(altUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: message,
+          sessionId: conversationId
+        })
+      });
+
+      if (altResponse.ok) {
+        const altData = await altResponse.json();
+        return res.json({ 
+          response: altData.response || altData.message || altData.text,
+          conversationId: altData.sessionId || conversationId
+        });
+      }
+
+      // If all methods fail, return error with details
+      return res.status(500).json({ 
+        error: 'Unable to communicate with Agentforce API',
+        details: 'Tried multiple API endpoints but none responded successfully',
+        note: 'Please check Salesforce Agentforce API documentation for correct endpoints. You may need to use a different API version or endpoint structure.'
+      });
+
+    } catch (error) {
+      console.error('Error communicating with agent:', error);
+      return res.status(500).json({ 
+        error: 'Failed to communicate with agent',
+        details: error.message
+      });
+    }
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Failed to process request', details: error.message });
