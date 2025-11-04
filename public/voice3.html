@@ -422,6 +422,28 @@
         let recognition = null;
         let lastFullText = '';
         let responseObserver = null;
+        
+        // Listen for messages from iframe (in case agent sends postMessage responses)
+        window.addEventListener('message', (event) => {
+            // Only accept messages from Salesforce domain
+            if (event.origin.includes('salesforce') || event.origin.includes('storm-11c5bf736713cf')) {
+                if (event.data && typeof event.data === 'object') {
+                    if (event.data.type === 'agentResponse' || event.data.message || event.data.text) {
+                        const responseText = event.data.message || event.data.text || JSON.stringify(event.data);
+                        if (responseText.length > 10 && isProcessing) {
+                            console.log('Received response via postMessage:', responseText.substring(0, 150));
+                            if (responseObserver) {
+                                responseObserver.disconnect();
+                                responseObserver = null;
+                            }
+                            addMessage('assistant', responseText);
+                            speakWithOpenAI(responseText);
+                            isProcessing = false;
+                        }
+                    }
+                }
+            }
+        });
 
         function toggleVoice() {
             if (!agentReady) {
@@ -529,62 +551,37 @@
                     throw new Error('Agent iframe not found');
                 }
 
-                await new Promise(resolve => setTimeout(resolve, 1000));
-
+                // Since we can't access cross-origin iframe DOM, use postMessage
+                // This is the only reliable way to interact with cross-origin iframes
                 try {
-                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                    const inputSelectors = [
-                        'input[type="text"]',
-                        'textarea',
-                        '[contenteditable="true"]',
-                        '[role="textbox"]'
-                    ];
-                    
-                    let inputField = null;
-                    for (const selector of inputSelectors) {
-                        inputField = iframeDoc.querySelector(selector);
-                        if (inputField) break;
-                    }
-                    
-                    if (inputField) {
-                        inputField.focus();
-                        
-                        if (inputField.tagName === 'INPUT' || inputField.tagName === 'TEXTAREA') {
-                            inputField.value = userMessage;
-                        } else {
-                            inputField.textContent = userMessage;
-                        }
-                        
-                        ['input', 'change'].forEach(eventType => {
-                            const event = new Event(eventType, { bubbles: true });
-                            inputField.dispatchEvent(event);
-                        });
-                        
-                        setTimeout(() => {
-                            const sendButton = iframeDoc.querySelector('button[type="submit"], button[aria-label*="Send"], [class*="send"]');
-                            if (sendButton) {
-                                sendButton.click();
-                            } else {
-                                const enterEvent = new KeyboardEvent('keydown', {
-                                    key: 'Enter',
-                                    code: 'Enter',
-                                    keyCode: 13,
-                                    bubbles: true
-                                });
-                                inputField.dispatchEvent(enterEvent);
-                            }
-                            
-                            monitorAgentResponse();
-                        }, 500);
-                    } else {
-                        throw new Error('Input field not found');
-                    }
-                } catch (err) {
-                    console.error('Cross-origin error:', err);
+                    // Try postMessage first (most reliable for cross-origin)
                     iframe.contentWindow.postMessage({
                         type: 'sendMessage',
                         message: userMessage
                     }, '*');
+                    
+                    // Also try multiple message formats that different agents might expect
+                    setTimeout(() => {
+                        iframe.contentWindow.postMessage({
+                            type: 'userMessage',
+                            text: userMessage,
+                            data: userMessage
+                        }, '*');
+                    }, 100);
+                    
+                    setTimeout(() => {
+                        iframe.contentWindow.postMessage({
+                            action: 'send',
+                            message: userMessage
+                        }, '*');
+                    }, 200);
+                    
+                    // Start monitoring for response
+                    monitorAgentResponse();
+                    
+                } catch (err) {
+                    console.error('Error sending message:', err);
+                    // Still try to monitor - agent might have received the message
                     monitorAgentResponse();
                 }
             } catch (error) {
@@ -605,6 +602,7 @@
             }
 
             // Wait a moment for message to be sent, then set a more accurate baseline
+            // Give it time for the user message to appear in the sidebar
             setTimeout(() => {
                 if (sidebar) {
                     const currentText = (sidebar.textContent || sidebar.innerText || '').trim();
@@ -614,7 +612,7 @@
                         console.log('Updated baseline after send:', lastFullText.substring(0, 100));
                     }
                 }
-            }, 2000);
+            }, 3000);
 
             // Create observer
             if (sidebar) {
