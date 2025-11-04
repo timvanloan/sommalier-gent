@@ -212,6 +212,67 @@
     <script type='text/javascript'>
     var targetContainer = document.getElementById('embedded-messaging-agent');
     var agentReady = false;
+    var welcomeMessageCaptured = false;
+    var initialWelcomeObserver = null;
+    
+    function captureInitialWelcomeMessage() {
+        const sidebar = document.querySelector('.embeddedServiceSidebar');
+        if (!sidebar || welcomeMessageCaptured) return;
+        
+        // Check for welcome message immediately
+        const checkForWelcome = () => {
+            const sidebarText = (sidebar.textContent || sidebar.innerText || '').trim();
+            if (sidebarText && sidebarText.length > 10) {
+                // Filter out UI elements
+                const filteredText = sidebarText
+                    .replace(/Type your message/gi, '')
+                    .replace(/Send/gi, '')
+                    .replace(/Enter your message/gi, '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                
+                const words = filteredText.split(/\s+/).filter(w => w.length > 0);
+                if (filteredText.length > 10 && words.length >= 3 && !filteredText.toLowerCase().includes('click')) {
+                    welcomeMessageCaptured = true;
+                    console.log('Welcome message captured:', filteredText.substring(0, 150));
+                    
+                    // Add to transcript and speak
+                    setTimeout(() => {
+                        addToTranscript('assistant', filteredText);
+                        speakWithOpenAI(filteredText);
+                    }, 1000);
+                    
+                    if (initialWelcomeObserver) {
+                        initialWelcomeObserver.disconnect();
+                        initialWelcomeObserver = null;
+                    }
+                    return;
+                }
+            }
+        };
+        
+        // Check immediately
+        checkForWelcome();
+        
+        // Also observe for changes
+        initialWelcomeObserver = new MutationObserver(() => {
+            checkForWelcome();
+        });
+        
+        initialWelcomeObserver.observe(sidebar, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+        
+        // Stop checking after 10 seconds
+        setTimeout(() => {
+            if (initialWelcomeObserver) {
+                initialWelcomeObserver.disconnect();
+                initialWelcomeObserver = null;
+            }
+        }, 10000);
+    }
     
     function initEmbeddedMessaging() {
         try {
@@ -245,6 +306,11 @@
                     embeddedservice_bootstrap.utilAPI.launchChat();
                     agentReady = true;
                     document.getElementById('statusText').textContent = 'Ready - Click to speak';
+                    
+                    // Start monitoring for welcome message
+                    setTimeout(() => {
+                        captureInitialWelcomeMessage();
+                    }, 2000);
                 }
             }, 1000);
         }
@@ -269,6 +335,11 @@
             clearInterval(widgetChecker);
             agentReady = true;
             document.getElementById('statusText').textContent = 'Ready - Click to speak';
+            
+            // Start monitoring for welcome message
+            setTimeout(() => {
+                captureInitialWelcomeMessage();
+            }, 2000);
         }
     }, 200);
     
@@ -414,7 +485,16 @@
             updateUI('processing');
             document.getElementById('statusText').textContent = 'Processing...';
             
-            // Reset baseline tracking
+            // Reset baseline tracking - get current text AFTER user message is sent
+            setTimeout(() => {
+                const sidebar = document.querySelector('.embeddedServiceSidebar');
+                if (sidebar) {
+                    lastFullText = (sidebar.textContent || sidebar.innerText || '').trim();
+                    console.log('Baseline set after user message:', lastFullText.substring(0, 100));
+                    initialBaselineSet = true;
+                }
+            }, 1500);
+            
             initialBaselineSet = false;
             lastFullText = '';
             lastMessageCount = 0;
