@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sommalier Gent - Voice Agent</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            overflow: hidden;
+        }
+
+        .voice3-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .voice3-content {
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
+
+        .conversation-area {
+            flex: 1;
+            width: 100%;
+            overflow-y: auto;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            scroll-behavior: smooth;
+        }
+
+        .message-bubble {
+            max-width: 75%;
+            padding: 12px 18px;
+            border-radius: 20px;
+            word-wrap: break-word;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message-bubble.user {
+            background: rgba(255, 255, 255, 0.25);
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-bubble.assistant {
+            background: rgba(255, 255, 255, 0.15);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-text {
+            color: white;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .voice-control-area {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .voice-button-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .voice-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            position: relative;
+            z-index: 10001;
+            pointer-events: auto !important;
+        }
+
+        .voice-button:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(1.05);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .voice-button.listening {
+            background: rgba(59, 130, 246, 0.4);
+            border-color: rgba(59, 130, 246, 0.6);
+            animation: pulse 1.5s infinite;
+        }
+
+        .voice-button.processing {
+            background: rgba(251, 191, 36, 0.4);
+            border-color: rgba(251, 191, 36, 0.6);
+            animation: pulse 1.5s infinite;
+        }
+
+        .voice-button.speaking {
+            background: rgba(34, 197, 94, 0.4);
+            border-color: rgba(34, 197, 94, 0.6);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { 
+                transform: scale(1);
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            }
+            50% { 
+                transform: scale(1.1);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            }
+        }
+
+        .status-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            pointer-events: none;
+        }
+
+        .status-indicator.active {
+            border-color: rgba(59, 130, 246, 0.5);
+            animation: ripple 1.5s infinite;
+        }
+
+        @keyframes ripple {
+            0% {
+                transform: translate(-50%, -50%) scale(0.8);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        .status-text {
+            color: white;
+            font-size: 16px;
+            text-align: center;
+            min-height: 24px;
+            font-weight: 300;
+        }
+
+        .transcript-preview {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            text-align: center;
+            min-height: 20px;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        /* Hide agent but keep it functional */
+        #embedded-messaging-agent {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0;
+            pointer-events: none !important;
+        }
+
+        #embedded-messaging-agent * {
+            pointer-events: none !important;
+        }
+
+        #embedded-messaging-agent iframe {
+            width: 100% !important;
+            height: 100% !important;
+            pointer-events: none !important;
+        }
+
+        .embeddedServiceSidebar {
+            pointer-events: none !important;
+        }
+
+        .embeddedServiceSidebar * {
+            pointer-events: none !important;
+        }
+
+        /* Scrollbar styling */
+        .conversation-area::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .conversation-area::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .conversation-area::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+
+        .conversation-area::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="background-container">
+        <img src="background.png" alt="Background" class="background-image">
+    </div>
+    
+    <div class="voice3-container">
+        <div class="voice3-content">
+            <!-- Hidden Salesforce Agentforce Agent -->
+            <div id="embedded-messaging-agent"></div>
+            
+            <!-- Conversation Area -->
+            <div class="conversation-area" id="conversationArea"></div>
+            
+            <!-- Voice Control Area -->
+            <div class="voice-control-area">
+                <div class="voice-button-container">
+                    <div class="status-indicator" id="statusIndicator"></div>
+                    <button class="voice-button" id="voiceButton" onclick="toggleVoice()">
+                        🎤
+                    </button>
+                </div>
+                <div class="status-text" id="statusText">Click to start speaking</div>
+                <div class="transcript-preview" id="transcriptPreview"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agentforce Bootstrap Script -->
+    <script type='text/javascript'>
+    var targetContainer = document.getElementById('embedded-messaging-agent');
+    var agentReady = false;
+    var conversationHistory = [];
+    
+    function initEmbeddedMessaging() {
+        try {
+            if (targetContainer && window.embeddedservice_bootstrap) {
+                embeddedservice_bootstrap.settings.targetElement = targetContainer;
+            }
+            
+            embeddedservice_bootstrap.settings.language = 'en_US';
+            embeddedservice_bootstrap.settings.widgetFontSize = "40px";
+            
+            embeddedservice_bootstrap.init(
+                '00DHu00000izUN6',
+                'SommalierGent_1',
+                'https://storm-11c5bf736713cf.my.site.com/ESWSommalierGent1762152842517',
+                {
+                    scrt2URL: 'https://storm-11c5bf736713cf.my.salesforce-scrt.com'
+                }
+            );
+        } catch (err) {
+            console.error('Error loading Embedded Messaging: ', err);
+        }
+    }
+    
+    window.addEventListener("onEmbeddedMessagingReady", function() {
+        if (targetContainer && window.embeddedservice_bootstrap) {
+            embeddedservice_bootstrap.settings.targetElement = targetContainer;
+            embeddedservice_bootstrap.settings.widgetFontSize = "40px";
+            
+            setTimeout(function() {
+                if (embeddedservice_bootstrap.utilAPI && embeddedservice_bootstrap.utilAPI.launchChat) {
+                    embeddedservice_bootstrap.utilAPI.launchChat();
+                    agentReady = true;
+                    document.getElementById('statusText').textContent = 'Ready - Click to speak';
+                    
+                    // Capture initial welcome message
+                    setTimeout(() => {
+                        captureInitialWelcome();
+                    }, 3000);
+                }
+            }, 1000);
+        }
+    });
+
+    var widgetChecker = setInterval(function() {
+        var sidebar = document.querySelector('.embeddedServiceSidebar');
+        
+        if (sidebar && targetContainer) {
+            if (!targetContainer.contains(sidebar)) {
+                try {
+                    sidebar.remove();
+                    targetContainer.appendChild(sidebar);
+                    agentReady = true;
+                } catch (err) {
+                    console.error('Error moving sidebar:', err);
+                }
+            }
+        }
+        
+        if (sidebar && targetContainer.contains(sidebar)) {
+            clearInterval(widgetChecker);
+            agentReady = true;
+            document.getElementById('statusText').textContent = 'Ready - Click to speak';
+            
+            setTimeout(() => {
+                captureInitialWelcome();
+            }, 3000);
+        }
+    }, 200);
+    
+    setTimeout(function() {
+        clearInterval(widgetChecker);
+    }, 10000);
+
+    function captureInitialWelcome() {
+        const sidebar = document.querySelector('.embeddedServiceSidebar');
+        if (!sidebar) return;
+        
+        const text = (sidebar.textContent || sidebar.innerText || '').trim();
+        const filteredText = text
+            .replace(/Type your message/gi, '')
+            .replace(/Send/gi, '')
+            .replace(/Enter your message/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        
+        const words = filteredText.split(/\s+/).filter(w => w.length > 0);
+        if (filteredText.length > 10 && words.length >= 3) {
+            addMessage('assistant', filteredText);
+            speakWithOpenAI(filteredText);
+        }
+    }
+    </script>
+    <script type='text/javascript' src='https://storm-11c5bf736713cf.my.site.com/ESWSommalierGent1762152842517/assets/js/bootstrap.min.js' onload='initEmbeddedMessaging()'></script>
+
+    <script>
+        let isListening = false;
+        let isProcessing = false;
+        let recognition = null;
+        let lastFullText = '';
+        let responseObserver = null;
+
+        function toggleVoice() {
+            if (!agentReady) {
+                document.getElementById('statusText').textContent = 'Agent initializing... Please wait';
+                return;
+            }
+
+            if (isProcessing) {
+                return;
+            }
+
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        function startListening() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
+
+                recognition.onstart = () => {
+                    isListening = true;
+                    updateUI('listening');
+                    document.getElementById('statusText').textContent = 'Listening...';
+                    document.getElementById('transcriptPreview').textContent = '';
+                };
+
+                recognition.onresult = (event) => {
+                    let interimTranscript = '';
+                    let finalTranscript = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            finalTranscript += transcript + ' ';
+                        } else {
+                            interimTranscript += transcript;
+                        }
+                    }
+
+                    if (interimTranscript) {
+                        document.getElementById('transcriptPreview').textContent = interimTranscript;
+                    }
+
+                    if (finalTranscript) {
+                        const userMessage = finalTranscript.trim();
+                        addMessage('user', userMessage);
+                        sendToAgentforce(userMessage);
+                    }
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    updateUI('idle');
+                    document.getElementById('statusText').textContent = 'Error: ' + event.error;
+                    isListening = false;
+                };
+
+                recognition.onend = () => {
+                    isListening = false;
+                    if (!isProcessing) {
+                        updateUI('idle');
+                        document.getElementById('statusText').textContent = 'Click to speak again';
+                    }
+                };
+
+                recognition.start();
+            } else {
+                alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.');
+            }
+        }
+
+        function stopListening() {
+            if (recognition) {
+                recognition.stop();
+            }
+            isListening = false;
+            updateUI('idle');
+            document.getElementById('statusText').textContent = 'Stopped';
+        }
+
+        async function sendToAgentforce(userMessage) {
+            isProcessing = true;
+            updateUI('processing');
+            document.getElementById('statusText').textContent = 'Processing...';
+            document.getElementById('transcriptPreview').textContent = '';
+
+            // Reset baseline
+            setTimeout(() => {
+                const sidebar = document.querySelector('.embeddedServiceSidebar');
+                if (sidebar) {
+                    lastFullText = (sidebar.textContent || sidebar.innerText || '').trim();
+                }
+            }, 1500);
+
+            try {
+                const iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
+                
+                if (!iframe) {
+                    throw new Error('Agent iframe not found');
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    const inputSelectors = [
+                        'input[type="text"]',
+                        'textarea',
+                        '[contenteditable="true"]',
+                        '[role="textbox"]'
+                    ];
+                    
+                    let inputField = null;
+                    for (const selector of inputSelectors) {
+                        inputField = iframeDoc.querySelector(selector);
+                        if (inputField) break;
+                    }
+                    
+                    if (inputField) {
+                        inputField.focus();
+                        
+                        if (inputField.tagName === 'INPUT' || inputField.tagName === 'TEXTAREA') {
+                            inputField.value = userMessage;
+                        } else {
+                            inputField.textContent = userMessage;
+                        }
+                        
+                        ['input', 'change'].forEach(eventType => {
+                            const event = new Event(eventType, { bubbles: true });
+                            inputField.dispatchEvent(event);
+                        });
+                        
+                        setTimeout(() => {
+                            const sendButton = iframeDoc.querySelector('button[type="submit"], button[aria-label*="Send"], [class*="send"]');
+                            if (sendButton) {
+                                sendButton.click();
+                            } else {
+                                const enterEvent = new KeyboardEvent('keydown', {
+                                    key: 'Enter',
+                                    code: 'Enter',
+                                    keyCode: 13,
+                                    bubbles: true
+                                });
+                                inputField.dispatchEvent(enterEvent);
+                            }
+                            
+                            monitorAgentResponse();
+                        }, 500);
+                    } else {
+                        throw new Error('Input field not found');
+                    }
+                } catch (err) {
+                    console.error('Cross-origin error:', err);
+                    iframe.contentWindow.postMessage({
+                        type: 'sendMessage',
+                        message: userMessage
+                    }, '*');
+                    monitorAgentResponse();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('statusText').textContent = 'Error: ' + error.message;
+                isProcessing = false;
+                updateUI('idle');
+            }
+        }
+
+        function monitorAgentResponse() {
+            const sidebar = document.querySelector('.embeddedServiceSidebar');
+            
+            // Clear existing observer
+            if (responseObserver) {
+                responseObserver.disconnect();
+                responseObserver = null;
+            }
+
+            // Create observer
+            if (sidebar) {
+                responseObserver = new MutationObserver(() => {
+                    const currentText = (sidebar.textContent || sidebar.innerText || '').trim();
+                    
+                    if (currentText && currentText.length > lastFullText.length + 10) {
+                        const newText = currentText.substring(lastFullText.length).trim();
+                        const filteredText = newText
+                            .replace(/Type your message/gi, '')
+                            .replace(/Send/gi, '')
+                            .replace(/Enter your message/gi, '')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+                        
+                        const words = filteredText.split(/\s+/).filter(w => w.length > 0);
+                        if (filteredText.length > 10 && words.length >= 2) {
+                            lastFullText = currentText;
+                            
+                            if (responseObserver) {
+                                responseObserver.disconnect();
+                                responseObserver = null;
+                            }
+                            
+                            addMessage('assistant', filteredText);
+                            speakWithOpenAI(filteredText);
+                            isProcessing = false;
+                        }
+                    }
+                });
+                
+                responseObserver.observe(sidebar, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true
+                });
+            }
+
+            // Polling fallback
+            let pollCount = 0;
+            const pollInterval = setInterval(() => {
+                pollCount++;
+                
+                if (sidebar) {
+                    const currentFullText = (sidebar.textContent || sidebar.innerText || '').trim();
+                    if (currentFullText.length > lastFullText.length + 10) {
+                        const newText = currentFullText.substring(lastFullText.length).trim();
+                        const filteredText = newText
+                            .replace(/Type your message/gi, '')
+                            .replace(/Send/gi, '')
+                            .replace(/Enter your message/gi, '')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+                        
+                        const words = filteredText.split(/\s+/).filter(w => w.length > 0);
+                        if (filteredText.length > 10 && words.length >= 2) {
+                            lastFullText = currentFullText;
+                            clearInterval(pollInterval);
+                            if (responseObserver) {
+                                responseObserver.disconnect();
+                                responseObserver = null;
+                            }
+                            addMessage('assistant', filteredText);
+                            speakWithOpenAI(filteredText);
+                            isProcessing = false;
+                            return;
+                        }
+                    }
+                }
+                
+                if (pollCount > 45) {
+                    clearInterval(pollInterval);
+                    if (responseObserver) {
+                        responseObserver.disconnect();
+                        responseObserver = null;
+                    }
+                    if (isProcessing) {
+                        document.getElementById('statusText').textContent = 'No response - try again';
+                        isProcessing = false;
+                        updateUI('idle');
+                    }
+                }
+            }, 1000);
+        }
+
+        async function speakWithOpenAI(text) {
+            updateUI('speaking');
+            document.getElementById('statusText').textContent = 'Speaking...';
+
+            try {
+                const response = await fetch('/api/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+
+                if (response.ok) {
+                    const audioBlob = await response.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const audio = new Audio(audioUrl);
+                    
+                    audio.onended = () => {
+                        updateUI('idle');
+                        document.getElementById('statusText').textContent = 'Click to speak again';
+                        URL.revokeObjectURL(audioUrl);
+                    };
+                    
+                    audio.onerror = () => {
+                        updateUI('idle');
+                        document.getElementById('statusText').textContent = 'Error playing audio';
+                    };
+                    
+                    audio.play();
+                } else {
+                    speakWithBrowserTTS(text);
+                }
+            } catch (error) {
+                console.error('TTS error:', error);
+                speakWithBrowserTTS(text);
+            }
+        }
+
+        function speakWithBrowserTTS(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                utterance.volume = 1.0;
+
+                utterance.onend = () => {
+                    updateUI('idle');
+                    document.getElementById('statusText').textContent = 'Click to speak again';
+                };
+
+                utterance.onerror = () => {
+                    updateUI('idle');
+                    document.getElementById('statusText').textContent = 'Error speaking';
+                };
+
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function updateUI(state) {
+            const button = document.getElementById('voiceButton');
+            const indicator = document.getElementById('statusIndicator');
+            button.className = 'voice-button';
+            indicator.classList.remove('active');
+            
+            if (state === 'listening') {
+                button.classList.add('listening');
+                button.textContent = '🔴';
+                indicator.classList.add('active');
+            } else if (state === 'speaking') {
+                button.classList.add('speaking');
+                button.textContent = '🔊';
+            } else if (state === 'processing') {
+                button.classList.add('processing');
+                button.textContent = '⏳';
+            } else {
+                button.textContent = '🎤';
+            }
+        }
+
+        function addMessage(role, text) {
+            const conversationArea = document.getElementById('conversationArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message-bubble ${role}`;
+            
+            const textDiv = document.createElement('div');
+            textDiv.className = 'message-text';
+            textDiv.textContent = text;
+            messageDiv.appendChild(textDiv);
+            
+            conversationArea.appendChild(messageDiv);
+            conversationArea.scrollTop = conversationArea.scrollHeight;
+        }
+    </script>
+</body>
+</html>
+

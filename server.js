@@ -65,6 +65,11 @@ app.get('/voice2', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'voice2.html'));
 });
 
+// Route for voice3 page
+app.get('/voice3', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'voice3.html'));
+});
+
 // API endpoint to get Agentforce agent response
 app.post('/api/agentforce-chat', async (req, res) => {
   try {
