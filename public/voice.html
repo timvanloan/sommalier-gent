@@ -13,8 +13,17 @@
             justify-content: center;
             height: 100%;
             gap: 30px;
-            position: relative;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             z-index: 1002;
+            pointer-events: none;
+        }
+
+        .voice-button {
+            pointer-events: auto;
         }
 
         .voice-button {
@@ -111,19 +120,21 @@
             z-index: 1002;
         }
 
-        /* Hide the embedded agent visually but keep it functional */
+        /* Position the embedded agent behind voice controls but make it functional */
         #embedded-messaging-agent {
             position: absolute;
-            opacity: 0;
-            pointer-events: none;
-            width: 1px;
-            height: 1px;
-            overflow: hidden;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0.3;
+            pointer-events: auto;
         }
 
         #embedded-messaging-agent iframe {
-            width: 1px !important;
-            height: 1px !important;
+            width: 100% !important;
+            height: 100% !important;
         }
     </style>
 </head>
@@ -306,96 +317,135 @@
             document.getElementById('statusText').textContent = 'Sending to agent...';
 
             try {
-                // Method 1: Try using Embedded Service API if available
-                if (window.embeddedservice_bootstrap && window.embeddedservice_bootstrap.utilAPI) {
-                    // Try to send message via API
-                    if (window.embeddedservice_bootstrap.utilAPI.sendMessage) {
-                        window.embeddedservice_bootstrap.utilAPI.sendMessage(userMessage);
-                        startMonitoringAgentResponse();
-                        return;
-                    }
-                }
-
-                // Method 2: Try to interact with iframe directly
+                // Find the iframe
                 const iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
                 
-                if (iframe) {
-                    // Try postMessage first (most reliable for cross-origin)
-                    iframe.contentWindow.postMessage({
-                        type: 'sendMessage',
-                        message: userMessage,
-                        action: 'send'
-                    }, '*');
-                    
-                    // Also try direct DOM manipulation if same-origin
-                    setTimeout(() => {
-                        try {
-                            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                            const inputSelector = 'input[type="text"], textarea, [contenteditable="true"], [role="textbox"]';
-                            const inputField = iframeDoc.querySelector(inputSelector);
-                            
-                            if (inputField) {
-                                // Set the value
-                                if (inputField.tagName === 'INPUT' || inputField.tagName === 'TEXTAREA') {
-                                    inputField.value = userMessage;
-                                    inputField.focus();
-                                } else {
-                                    inputField.textContent = userMessage;
-                                    inputField.focus();
-                                }
-                                
-                                // Trigger events
-                                ['input', 'change', 'keyup'].forEach(eventType => {
-                                    const event = new Event(eventType, { bubbles: true });
-                                    inputField.dispatchEvent(event);
-                                });
-                                
-                                // Try to submit
-                                setTimeout(() => {
-                                    const sendButton = iframeDoc.querySelector('button[type="submit"], button[aria-label*="Send"], button[aria-label*="send"], .send-button, [class*="send"], [data-action="send"]');
-                                    if (sendButton) {
-                                        sendButton.click();
-                                    } else {
-                                        // Try Enter key
-                                        const enterEvent = new KeyboardEvent('keydown', {
-                                            key: 'Enter',
-                                            code: 'Enter',
-                                            keyCode: 13,
-                                            which: 13,
-                                            bubbles: true,
-                                            cancelable: true
-                                        });
-                                        inputField.dispatchEvent(enterEvent);
-                                        
-                                        const enterPress = new KeyboardEvent('keypress', {
-                                            key: 'Enter',
-                                            code: 'Enter',
-                                            keyCode: 13,
-                                            which: 13,
-                                            bubbles: true,
-                                            cancelable: true
-                                        });
-                                        inputField.dispatchEvent(enterPress);
-                                    }
-                                    
-                                    startMonitoringAgentResponse();
-                                }, 300);
-                            } else {
-                                startMonitoringAgentResponse();
-                            }
-                        } catch (err) {
-                            console.log('Cross-origin iframe, using postMessage only:', err);
-                            startMonitoringAgentResponse();
-                        }
-                    }, 500);
-                    
-                    startMonitoringAgentResponse();
-                } else {
+                if (!iframe) {
                     console.error('Could not find agent iframe');
                     document.getElementById('statusText').textContent = 'Error: Agent not loaded';
                     isProcessing = false;
                     updateUI('idle');
+                    return;
                 }
+
+                // Wait for iframe to be ready
+                setTimeout(() => {
+                    try {
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        
+                        // Try multiple selectors for input field
+                        const inputSelectors = [
+                            'input[type="text"]',
+                            'textarea',
+                            '[contenteditable="true"]',
+                            '[role="textbox"]',
+                            '[aria-label*="message"]',
+                            '[aria-label*="Message"]',
+                            '.input-field',
+                            '[class*="input"]',
+                            '[class*="Input"]'
+                        ];
+                        
+                        let inputField = null;
+                        for (const selector of inputSelectors) {
+                            inputField = iframeDoc.querySelector(selector);
+                            if (inputField) break;
+                        }
+                        
+                        if (inputField) {
+                            // Focus the input
+                            inputField.focus();
+                            
+                            // Clear any existing value
+                            if (inputField.tagName === 'INPUT' || inputField.tagName === 'TEXTAREA') {
+                                inputField.value = '';
+                                inputField.value = userMessage;
+                            } else {
+                                inputField.textContent = '';
+                                inputField.textContent = userMessage;
+                            }
+                            
+                            // Trigger multiple events to ensure the agent recognizes the input
+                            ['focus', 'input', 'change', 'keyup', 'keydown'].forEach(eventType => {
+                                const event = new Event(eventType, { bubbles: true, cancelable: true });
+                                inputField.dispatchEvent(event);
+                            });
+                            
+                            // Wait a moment then try to send
+                            setTimeout(() => {
+                                // Try to find send button
+                                const sendSelectors = [
+                                    'button[type="submit"]',
+                                    'button[aria-label*="Send"]',
+                                    'button[aria-label*="send"]',
+                                    '.send-button',
+                                    '[class*="send"]',
+                                    '[data-action="send"]',
+                                    '[title*="Send"]',
+                                    '[title*="send"]'
+                                ];
+                                
+                                let sendButton = null;
+                                for (const selector of sendSelectors) {
+                                    sendButton = iframeDoc.querySelector(selector);
+                                    if (sendButton && sendButton.offsetParent !== null) break;
+                                }
+                                
+                                if (sendButton) {
+                                    sendButton.click();
+                                } else {
+                                    // Try pressing Enter
+                                    const enterEvent = new KeyboardEvent('keydown', {
+                                        key: 'Enter',
+                                        code: 'Enter',
+                                        keyCode: 13,
+                                        which: 13,
+                                        bubbles: true,
+                                        cancelable: true
+                                    });
+                                    inputField.dispatchEvent(enterEvent);
+                                    
+                                    const enterPress = new KeyboardEvent('keypress', {
+                                        key: 'Enter',
+                                        code: 'Enter',
+                                        keyCode: 13,
+                                        which: 13,
+                                        bubbles: true,
+                                        cancelable: true
+                                    });
+                                    inputField.dispatchEvent(enterPress);
+                                    
+                                    const enterUp = new KeyboardEvent('keyup', {
+                                        key: 'Enter',
+                                        code: 'Enter',
+                                        keyCode: 13,
+                                        which: 13,
+                                        bubbles: true,
+                                        cancelable: true
+                                    });
+                                    inputField.dispatchEvent(enterUp);
+                                }
+                                
+                                // Start monitoring for response
+                                startMonitoringAgentResponse();
+                            }, 500);
+                        } else {
+                            console.error('Could not find input field');
+                            document.getElementById('statusText').textContent = 'Error: Could not find agent input field';
+                            isProcessing = false;
+                            updateUI('idle');
+                        }
+                    } catch (err) {
+                        console.error('Cross-origin error:', err);
+                        // Fallback: try postMessage
+                        iframe.contentWindow.postMessage({
+                            type: 'sendMessage',
+                            message: userMessage
+                        }, '*');
+                        startMonitoringAgentResponse();
+                    }
+                }, 1000);
+                
             } catch (error) {
                 console.error('Error:', error);
                 document.getElementById('statusText').textContent = 'Error: ' + error.message;
@@ -406,6 +456,8 @@
 
         let responseCheckInterval = null;
         let lastResponseText = '';
+        let lastMessageCount = 0;
+        let messageObserver = null;
 
         function startMonitoringAgentResponse() {
             // Clear any existing interval
@@ -413,13 +465,20 @@
                 clearInterval(responseCheckInterval);
             }
 
+            // Reset message count
+            lastMessageCount = 0;
+            const initialText = lastResponseText;
+
             // Monitor the chat for new messages from the agent
             responseCheckInterval = setInterval(() => {
                 try {
                     const iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
+                    const sidebar = document.querySelector('.embeddedServiceSidebar');
+                    
                     if (iframe) {
                         try {
                             const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                            
                             // Try multiple selectors for chat messages
                             const messageSelectors = [
                                 '[class*="message"]',
@@ -428,72 +487,106 @@
                                 '[role="article"]',
                                 '[class*="bubble"]',
                                 '[class*="Bubble"]',
-                                '[data-testid*="message"]'
+                                '[data-testid*="message"]',
+                                '[class*="chat"]',
+                                '[class*="Chat"]'
                             ];
                             
-                            let messages = [];
+                            let allMessages = [];
                             messageSelectors.forEach(selector => {
                                 const found = iframeDoc.querySelectorAll(selector);
                                 if (found.length > 0) {
-                                    messages = Array.from(found);
+                                    allMessages = Array.from(found);
                                 }
                             });
                             
-                            if (messages.length > 0) {
-                                // Get the last message
-                                const lastMessage = messages[messages.length - 1];
-                                const messageText = (lastMessage.textContent || lastMessage.innerText).trim();
+                            // Also try getting all text elements that might be messages
+                            if (allMessages.length === 0) {
+                                const allTextElements = iframeDoc.querySelectorAll('div, span, p');
+                                allMessages = Array.from(allTextElements).filter(el => {
+                                    const text = (el.textContent || '').trim();
+                                    return text.length > 20 && text.length < 1000;
+                                });
+                            }
+                            
+                            if (allMessages.length > lastMessageCount) {
+                                // New message detected - get the last one
+                                const newMessage = allMessages[allMessages.length - 1];
+                                const messageText = (newMessage.textContent || newMessage.innerText || '').trim();
                                 
-                                // Check if it's a new response from the agent
-                                if (messageText && messageText !== lastResponseText && messageText.length > 10) {
-                                    // Check if it's not a user message (user messages often have different styling)
-                                    const isUserMessage = lastMessage.classList.contains('user') || 
-                                                         lastMessage.classList.contains('sent') ||
-                                                         lastMessage.querySelector('[class*="user"]') ||
-                                                         lastMessage.getAttribute('data-sender') === 'user';
+                                // Check if it's different from what we've seen and is a reasonable length
+                                if (messageText && messageText !== lastResponseText && messageText.length > 15 && messageText.length < 2000) {
+                                    // Try to determine if it's from the agent (not user)
+                                    const isUserMessage = newMessage.classList.contains('user') || 
+                                                         newMessage.classList.contains('sent') ||
+                                                         newMessage.classList.contains('outgoing') ||
+                                                         newMessage.querySelector('[class*="user"]') ||
+                                                         newMessage.getAttribute('data-sender') === 'user' ||
+                                                         newMessage.closest('[class*="user"]') ||
+                                                         newMessage.closest('[class*="sent"]');
                                     
                                     if (!isUserMessage) {
                                         clearInterval(responseCheckInterval);
                                         responseCheckInterval = null;
                                         lastResponseText = messageText;
+                                        lastMessageCount = allMessages.length;
                                         addMessage('assistant', messageText);
                                         speakText(messageText);
                                         isProcessing = false;
                                         return;
                                     }
                                 }
+                                
+                                lastMessageCount = allMessages.length;
                             }
                         } catch (err) {
-                            // Cross-origin - monitor parent container for changes
-                            const sidebar = document.querySelector('.embeddedServiceSidebar');
-                            if (sidebar) {
-                                const sidebarText = sidebar.textContent || sidebar.innerText;
-                                if (sidebarText && sidebarText !== lastResponseText && sidebarText.length > lastResponseText.length + 20) {
-                                    // Extract potential new message
-                                    const newText = sidebarText.substring(lastResponseText.length).trim();
-                                    if (newText.length > 10) {
-                                        clearInterval(responseCheckInterval);
-                                        responseCheckInterval = null;
-                                        lastResponseText = sidebarText;
-                                        addMessage('assistant', newText);
-                                        speakText(newText);
-                                        isProcessing = false;
-                                        return;
+                            // Cross-origin - use MutationObserver on sidebar
+                            if (sidebar && !messageObserver) {
+                                messageObserver = new MutationObserver((mutations) => {
+                                    const currentText = (sidebar.textContent || sidebar.innerText || '').trim();
+                                    
+                                    if (currentText && currentText !== lastResponseText && currentText.length > lastResponseText.length + 20) {
+                                        // Extract new text
+                                        const newText = currentText.substring(lastResponseText.length).trim();
+                                        
+                                        // Check if it's substantial enough to be a response
+                                        if (newText.length > 20 && !newText.includes(userMessage)) {
+                                            clearInterval(responseCheckInterval);
+                                            responseCheckInterval = null;
+                                            if (messageObserver) {
+                                                messageObserver.disconnect();
+                                                messageObserver = null;
+                                            }
+                                            lastResponseText = currentText;
+                                            addMessage('assistant', newText);
+                                            speakText(newText);
+                                            isProcessing = false;
+                                        }
                                     }
-                                }
+                                });
+                                
+                                messageObserver.observe(sidebar, {
+                                    childList: true,
+                                    subtree: true,
+                                    characterData: true
+                                });
                             }
                         }
                     }
                 } catch (err) {
                     console.log('Monitoring for agent response...', err);
                 }
-            }, 1000);
+            }, 800);
 
             // Stop monitoring after 30 seconds
             setTimeout(() => {
                 if (responseCheckInterval) {
                     clearInterval(responseCheckInterval);
                     responseCheckInterval = null;
+                }
+                if (messageObserver) {
+                    messageObserver.disconnect();
+                    messageObserver = null;
                 }
                 if (isProcessing) {
                     document.getElementById('statusText').textContent = 'No response received. Try clicking the microphone again.';
