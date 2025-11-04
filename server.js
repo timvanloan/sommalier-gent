@@ -71,6 +71,7 @@ app.get('/voice3', (req, res) => {
 });
 
 // API endpoint to get Agentforce agent response
+// Note: This is a placeholder - you'll need to integrate with Salesforce Agentforce API
 app.post('/api/agentforce-chat', async (req, res) => {
   try {
     const { message } = req.body;
@@ -79,11 +80,18 @@ app.post('/api/agentforce-chat', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
     
-    // This endpoint will be called from the frontend after getting response from Agentforce
-    // For now, we'll return a placeholder - the actual integration will happen client-side
+    // TODO: Integrate with Salesforce Agentforce API here
+    // For now, return a placeholder response indicating manual interaction is needed
+    // In a real implementation, you would:
+    // 1. Authenticate with Salesforce
+    // 2. Call Agentforce API endpoints
+    // 3. Get the agent's response
+    // 4. Return it to the client
+    
     res.json({ 
-      message: 'Agentforce response will be captured client-side',
-      received: message 
+      message: 'Agentforce API integration needed',
+      received: message,
+      note: 'Please integrate with Salesforce Agentforce REST API to enable programmatic messaging'
     });
   } catch (error) {
     console.error('Error:', error);

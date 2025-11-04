@@ -206,7 +206,7 @@
             font-style: italic;
         }
 
-        /* Make agent visible but behind voice controls */
+        /* Hide agent completely - only show conversation UI */
         #embedded-messaging-agent {
             position: absolute;
             top: 0;
@@ -214,26 +214,39 @@
             width: 100%;
             height: 100%;
             z-index: 1;
-            opacity: 0.4;
-            pointer-events: auto !important;
+            opacity: 0;
+            pointer-events: none !important;
+            visibility: hidden;
         }
 
         #embedded-messaging-agent * {
-            pointer-events: auto !important;
+            pointer-events: none !important;
         }
 
         #embedded-messaging-agent iframe {
             width: 100% !important;
             height: 100% !important;
-            pointer-events: auto !important;
+            pointer-events: none !important;
         }
 
         .embeddedServiceSidebar {
-            pointer-events: auto !important;
+            pointer-events: none !important;
+            visibility: hidden;
         }
 
         .embeddedServiceSidebar * {
-            pointer-events: auto !important;
+            pointer-events: none !important;
+        }
+        
+        /* But we still need to access sidebar text for monitoring */
+        .embeddedServiceSidebar {
+            visibility: hidden;
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
         }
 
         /* Scrollbar styling */
@@ -534,7 +547,7 @@
         async function sendToAgentforce(userMessage) {
             isProcessing = true;
             updateUI('processing');
-            document.getElementById('statusText').textContent = 'Processing...';
+            document.getElementById('statusText').textContent = 'Sending to agent...';
             document.getElementById('transcriptPreview').textContent = '';
 
             // Get current baseline BEFORE sending message
@@ -550,49 +563,35 @@
             // Show user message in our UI
             addMessage('user', userMessage);
             
-            // Copy message to clipboard so user can paste it
+            // Since we can't programmatically send to embedded agent,
+            // we need to use a server-side API or accept manual interaction
+            // For now, let's try using our server as a proxy
             try {
-                await navigator.clipboard.writeText(userMessage);
-                console.log('Message copied to clipboard');
-            } catch (err) {
-                console.log('Clipboard not available:', err);
-            }
-            
-            // Make agent more visible temporarily and show instructions
-            const agentContainer = document.getElementById('embedded-messaging-agent');
-            const sidebarEl = document.querySelector('.embeddedServiceSidebar');
-            
-            if (agentContainer && sidebarEl) {
-                // Make agent more visible
-                agentContainer.style.opacity = '0.7';
+                const response = await fetch('/api/agentforce-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userMessage })
+                });
                 
-                // Try to focus the agent iframe
-                const iframe = agentContainer.querySelector('iframe');
-                if (iframe) {
-                    try {
-                        iframe.focus();
-                    } catch (e) {
-                        console.log('Cannot focus iframe:', e);
-                    }
+                const data = await response.json();
+                console.log('Server response:', data);
+                
+                // If server has a response, use it
+                if (data.response || data.message) {
+                    const agentResponse = data.response || data.message;
+                    addMessage('assistant', agentResponse);
+                    speakWithOpenAI(agentResponse);
+                    isProcessing = false;
+                    updateUI('idle');
+                    document.getElementById('statusText').textContent = 'Click to speak again';
+                    return;
                 }
-                
-                // Show instruction
-                document.getElementById('statusText').textContent = 'Click in the agent chat below and paste your message (Ctrl+V / Cmd+V)';
-                
-                // Auto-hide instruction after 10 seconds
-                setTimeout(() => {
-                    if (isProcessing) {
-                        document.getElementById('statusText').textContent = 'Waiting for agent response...';
-                    }
-                }, 10000);
-                
-                // Hide agent again after 15 seconds
-                setTimeout(() => {
-                    agentContainer.style.opacity = '0.4';
-                }, 15000);
+            } catch (err) {
+                console.log('Server API not available, will monitor sidebar:', err);
             }
             
-            // Start monitoring for response
+            // Fallback: Monitor sidebar for response (agent might be responding via embedded widget)
+            document.getElementById('statusText').textContent = 'Waiting for agent response...';
             monitorAgentResponse();
         }
 
@@ -610,13 +609,17 @@
             setTimeout(() => {
                 if (sidebar) {
                     const currentText = (sidebar.textContent || sidebar.innerText || '').trim();
-                    // Only update if text has grown (user message was added)
+                    // Update baseline to include user message
                     if (currentText.length >= lastFullText.length) {
                         lastFullText = currentText;
-                        console.log('Updated baseline after send:', lastFullText.substring(0, 100));
+                        console.log('Updated baseline after send:', lastFullText.substring(0, 150));
+                    } else {
+                        console.log('Sidebar text not growing - current:', currentText.length, 'baseline:', lastFullText.length);
                     }
+                } else {
+                    console.log('Sidebar not found for baseline update');
                 }
-            }, 3000);
+            }, 5000); // Increased delay to account for manual paste
 
             // Create observer
             if (sidebar) {
