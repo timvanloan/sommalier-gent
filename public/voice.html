@@ -23,7 +23,17 @@
         }
 
         .voice-button {
-            pointer-events: auto;
+            pointer-events: auto !important;
+            cursor: pointer !important;
+        }
+
+        .status-text {
+            pointer-events: none;
+        }
+
+        .toggle-log {
+            pointer-events: auto !important;
+            cursor: pointer !important;
         }
 
         .voice-button {
@@ -129,12 +139,18 @@
             height: 100%;
             z-index: 1;
             opacity: 0.3;
-            pointer-events: auto;
+            pointer-events: none;
         }
 
         #embedded-messaging-agent iframe {
             width: 100% !important;
             height: 100% !important;
+            pointer-events: none !important;
+        }
+
+        /* Allow interaction with input field when needed */
+        #embedded-messaging-agent iframe.active {
+            pointer-events: auto !important;
         }
     </style>
 </head>
@@ -328,6 +344,9 @@
                     return;
                 }
 
+                // Temporarily enable pointer events on iframe for interaction
+                iframe.classList.add('active');
+                
                 // Wait for iframe to be ready
                 setTimeout(() => {
                     try {
@@ -428,12 +447,18 @@
                                 
                                 // Start monitoring for response
                                 startMonitoringAgentResponse();
+                                
+                                // Disable pointer events again after interaction
+                                setTimeout(() => {
+                                    iframe.classList.remove('active');
+                                }, 2000);
                             }, 500);
                         } else {
                             console.error('Could not find input field');
                             document.getElementById('statusText').textContent = 'Error: Could not find agent input field';
                             isProcessing = false;
                             updateUI('idle');
+                            iframe.classList.remove('active');
                         }
                     } catch (err) {
                         console.error('Cross-origin error:', err);
@@ -443,6 +468,7 @@
                             message: userMessage
                         }, '*');
                         startMonitoringAgentResponse();
+                        iframe.classList.remove('active');
                     }
                 }, 1000);
                 
