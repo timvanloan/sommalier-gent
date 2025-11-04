@@ -1,0 +1,42 @@
+# .forceignore
+
+# LWC configuration files
+**/jsconfig.json
+**/.eslintrc.json
+
+# LWC Jest
+**/__tests__/**
+
+# Salesforce DX files
+.sfdx/
+.localdevserver/
+
+# VS Code files
+.vscode/
+
+# Package files
+package-lock.json
+package.json
+node_modules/
+
+# Heroku files
+Procfile
+server.js
+public/
+config/
+static.json
+
+# Documentation
+*.md
+*.docx
+*.pdf
+
+# Images (unless needed)
+*.png
+*.jpg
+*.gif
+
+# Other
+.git/
+.DS_Store
+

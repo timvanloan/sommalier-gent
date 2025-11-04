@@ -1,0 +1,38 @@
+<template>
+    <lightning-card title="Sommalier Voice Agent">
+        <div class="voice-container">
+            <!-- Background Image -->
+            <div class="background-container">
+                <img src="/resource/background" alt="Background" class="background-image" />
+            </div>
+            
+            <!-- Voice Content -->
+            <div class="voice-content">
+                <!-- Conversation Area -->
+                <div class="conversation-area">
+                    <template for:each={conversationHistory} for:item="msg" for:index="index">
+                        <div key={index} class="message-bubble {msg.role}">
+                            <div class="message-text">{msg.text}</div>
+                        </div>
+                    </template>
+                </div>
+                
+                <!-- Voice Control Area -->
+                <div class="voice-control-area">
+                    <div class="voice-button-container">
+                        <div class="status-indicator"></div>
+                        <button 
+                            class="voice-button" 
+                            onclick={handleVoiceClick}
+                            disabled={isProcessing}>
+                            🎤
+                        </button>
+                    </div>
+                    <div class="status-text">{statusText}</div>
+                    <div class="transcript-preview">{transcriptPreview}</div>
+                </div>
+            </div>
+        </div>
+    </lightning-card>
+</template>
+

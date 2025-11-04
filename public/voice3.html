@@ -564,35 +564,43 @@
             addMessage('user', userMessage);
             
             // Since we can't programmatically send to embedded agent,
-            // we need to use a server-side API or accept manual interaction
-            // For now, let's try using our server as a proxy
+            // use server-side API to communicate with Agentforce API
             try {
                 const response = await fetch('/api/agentforce-chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: userMessage })
+                    body: JSON.stringify({ 
+                        message: userMessage,
+                        conversationId: window.conversationId // Maintain conversation session
+                    })
                 });
                 
                 const data = await response.json();
                 console.log('Server response:', data);
                 
                 // If server has a response, use it
-                if (data.response || data.message) {
-                    const agentResponse = data.response || data.message;
-                    addMessage('assistant', agentResponse);
-                    speakWithOpenAI(agentResponse);
+                if (data.response) {
+                    // Store conversation ID for future messages
+                    if (data.conversationId) {
+                        window.conversationId = data.conversationId;
+                    }
+                    
+                    addMessage('assistant', data.response);
+                    speakWithOpenAI(data.response);
                     isProcessing = false;
                     updateUI('idle');
                     document.getElementById('statusText').textContent = 'Click to speak again';
                     return;
+                } else if (data.error) {
+                    throw new Error(data.error + (data.details ? ': ' + data.details : ''));
                 }
             } catch (err) {
-                console.log('Server API not available, will monitor sidebar:', err);
+                console.error('Server API error:', err);
+                document.getElementById('statusText').textContent = 'Error: ' + err.message;
+                isProcessing = false;
+                updateUI('idle');
+                return;
             }
-            
-            // Fallback: Monitor sidebar for response (agent might be responding via embedded widget)
-            document.getElementById('statusText').textContent = 'Waiting for agent response...';
-            monitorAgentResponse();
         }
 
         function monitorAgentResponse() {
