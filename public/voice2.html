@@ -212,7 +212,6 @@
     <script type='text/javascript'>
     var targetContainer = document.getElementById('embedded-messaging-agent');
     var agentReady = false;
-    var lastMessageText = '';
     
     function initEmbeddedMessaging() {
         try {
@@ -491,24 +490,60 @@
         }
 
         let responseObserver = null;
+        let lastMessageCount = 0;
+        let lastFullText = '';
 
         function monitorAgentResponse() {
             const sidebar = document.querySelector('.embeddedServiceSidebar');
-            let lastText = '';
+            const iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
             
-            if (sidebar && !responseObserver) {
+            // Clear any existing observer
+            if (responseObserver) {
+                responseObserver.disconnect();
+                responseObserver = null;
+            }
+
+            // Start with a baseline of current text
+            if (sidebar) {
+                lastFullText = (sidebar.textContent || sidebar.innerText || '').trim();
+                lastMessageCount = 0;
+            }
+
+            // Create a new observer
+            if (sidebar) {
                 responseObserver = new MutationObserver(() => {
-                    const currentText = (sidebar.textContent || '').trim();
+                    const currentText = (sidebar.textContent || sidebar.innerText || '').trim();
                     
-                    if (currentText && currentText !== lastText && currentText.length > lastText.length + 20) {
-                        const newText = currentText.substring(lastText.length).trim();
+                    // Check if text has grown significantly (new message)
+                    if (currentText && currentText.length > lastFullText.length + 15) {
+                        // Extract the new portion
+                        const newText = currentText.substring(lastFullText.length).trim();
                         
-                        if (newText.length > 20 && !newText.includes('Type your message')) {
-                            lastText = currentText;
-                            addToTranscript('assistant', newText);
-                            speakWithOpenAI(newText);
-                            isProcessing = false;
-                            return;
+                        // Filter out common UI elements and check if it's substantial
+                        const filteredText = newText
+                            .replace(/Type your message/gi, '')
+                            .replace(/Send/gi, '')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+                        
+                        if (filteredText.length > 10 && filteredText.length < 5000) {
+                            // Check if this looks like a response (not just UI noise)
+                            const hasWords = filteredText.split(/\s+/).length >= 3;
+                            
+                            if (hasWords) {
+                                lastFullText = currentText;
+                                
+                                // Clean up
+                                if (responseObserver) {
+                                    responseObserver.disconnect();
+                                    responseObserver = null;
+                                }
+                                
+                                addToTranscript('assistant', filteredText);
+                                speakWithOpenAI(filteredText);
+                                isProcessing = false;
+                                return;
+                            }
                         }
                     }
                 });
@@ -516,27 +551,101 @@
                 responseObserver.observe(sidebar, {
                     childList: true,
                     subtree: true,
-                    characterData: true
+                    characterData: true,
+                    attributes: false
                 });
             }
 
-            // Also poll for changes
+            // Also try to listen for postMessage from iframe
+            const messageHandler = (event) => {
+                // Listen for messages from the iframe
+                if (event.data && typeof event.data === 'object') {
+                    if (event.data.type === 'message' || event.data.message || event.data.text) {
+                        const responseText = event.data.message || event.data.text || JSON.stringify(event.data);
+                        if (responseText.length > 10 && responseText.length < 5000) {
+                            window.removeEventListener('message', messageHandler);
+                            if (responseObserver) {
+                                responseObserver.disconnect();
+                                responseObserver = null;
+                            }
+                            addToTranscript('assistant', responseText);
+                            speakWithOpenAI(responseText);
+                            isProcessing = false;
+                        }
+                    }
+                }
+            };
+            
+            window.addEventListener('message', messageHandler);
+
+            // Polling fallback - check for new message elements
+            let pollCount = 0;
             const pollInterval = setInterval(() => {
-                const iframe = document.querySelector('#embedded-messaging-agent iframe');
+                pollCount++;
+                
+                if (sidebar) {
+                    // Get all text nodes and elements that might contain messages
+                    const allTextNodes = [];
+                    const walker = document.createTreeWalker(
+                        sidebar,
+                        NodeFilter.SHOW_TEXT,
+                        null,
+                        false
+                    );
+                    
+                    let node;
+                    while (node = walker.nextNode()) {
+                        const text = node.textContent.trim();
+                        if (text.length > 10 && text.length < 5000) {
+                            allTextNodes.push(text);
+                        }
+                    }
+                    
+                    // Check if we have new content
+                    const currentFullText = (sidebar.textContent || sidebar.innerText || '').trim();
+                    if (currentFullText.length > lastFullText.length + 15) {
+                        const newText = currentFullText.substring(lastFullText.length).trim();
+                        const filteredText = newText
+                            .replace(/Type your message/gi, '')
+                            .replace(/Send/gi, '')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+                        
+                        if (filteredText.length > 10 && filteredText.split(/\s+/).length >= 3) {
+                            lastFullText = currentFullText;
+                            clearInterval(pollInterval);
+                            window.removeEventListener('message', messageHandler);
+                            if (responseObserver) {
+                                responseObserver.disconnect();
+                                responseObserver = null;
+                            }
+                            addToTranscript('assistant', filteredText);
+                            speakWithOpenAI(filteredText);
+                            isProcessing = false;
+                            return;
+                        }
+                    }
+                }
+                
+                // Try iframe access (will fail on cross-origin but worth trying)
                 if (iframe) {
                     try {
                         const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                        const messages = iframeDoc.querySelectorAll('[class*="message"], [role="article"]');
+                        const messages = iframeDoc.querySelectorAll('[class*="message"], [role="article"], [class*="bubble"], [class*="chat"]');
                         
-                        if (messages.length > 0) {
-                            const lastMsg = messages[messages.length - 1];
-                            const msgText = (lastMsg.textContent || '').trim();
-                            
-                            if (msgText && msgText.length > 20 && !msgText.includes('Type your message')) {
-                                const isUser = lastMsg.classList.contains('user') || lastMsg.classList.contains('sent');
-                                if (!isUser && msgText !== lastMessageText) {
-                                    lastMessageText = msgText;
+                        if (messages.length > lastMessageCount) {
+                            const newMessages = Array.from(messages).slice(lastMessageCount);
+                            for (const msg of newMessages) {
+                                const msgText = (msg.textContent || '').trim();
+                                const isUser = msg.classList.contains('user') || 
+                                             msg.classList.contains('sent') ||
+                                             msg.classList.contains('outgoing') ||
+                                             msg.querySelector('[class*="user"]');
+                                
+                                if (!isUser && msgText.length > 10 && msgText.length < 5000) {
+                                    lastMessageCount = messages.length;
                                     clearInterval(pollInterval);
+                                    window.removeEventListener('message', messageHandler);
                                     if (responseObserver) {
                                         responseObserver.disconnect();
                                         responseObserver = null;
@@ -544,23 +653,31 @@
                                     addToTranscript('assistant', msgText);
                                     speakWithOpenAI(msgText);
                                     isProcessing = false;
+                                    return;
                                 }
                             }
+                            lastMessageCount = messages.length;
                         }
                     } catch (err) {
-                        // Cross-origin
+                        // Cross-origin - expected
+                    }
+                }
+                
+                // Stop after 45 seconds
+                if (pollCount > 45) {
+                    clearInterval(pollInterval);
+                    window.removeEventListener('message', messageHandler);
+                    if (responseObserver) {
+                        responseObserver.disconnect();
+                        responseObserver = null;
+                    }
+                    if (isProcessing) {
+                        document.getElementById('statusText').textContent = 'No response received - try again';
+                        isProcessing = false;
+                        updateUI('idle');
                     }
                 }
             }, 1000);
-
-            setTimeout(() => {
-                clearInterval(pollInterval);
-                if (isProcessing) {
-                    document.getElementById('statusText').textContent = 'No response - try again';
-                    isProcessing = false;
-                    updateUI('idle');
-                }
-            }, 30000);
         }
 
         async function speakWithOpenAI(text) {
