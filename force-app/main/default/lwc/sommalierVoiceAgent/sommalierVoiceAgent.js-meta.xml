@@ -9,10 +9,5 @@
         <target>lightningCommunity__Page</target>
         <target>lightningCommunity__Default</target>
     </targets>
-    <targetConfigs>
-        <targetConfig targets="lightningCommunity__Default">
-            <property name="backgroundImage" type="String" default="" label="Background Image URL" />
-        </targetConfig>
-    </targetConfigs>
 </LightningComponentBundle>
 

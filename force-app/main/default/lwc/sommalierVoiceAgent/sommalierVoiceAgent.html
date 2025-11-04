@@ -1,17 +1,16 @@
 <template>
-    <lightning-card title="Sommalier Voice Agent">
-        <div class="voice-container">
-            <!-- Background Image -->
-            <div class="background-container">
-                <img src="/resource/background" alt="Background" class="background-image" />
-            </div>
-            
-            <!-- Voice Content -->
-            <div class="voice-content">
+    <div class="voice-container">
+        <!-- Background Image -->
+        <div class="background-container">
+            <!-- Background will be set via CSS or can be removed -->
+        </div>
+        
+        <!-- Voice Content -->
+        <div class="voice-content">
                 <!-- Conversation Area -->
                 <div class="conversation-area">
-                    <template for:each={conversationHistory} for:item="msg" for:index="index">
-                        <div key={index} class="message-bubble {msg.role}">
+                    <template for:each={conversationHistory} for:item="msg">
+                        <div key={msg.id} class="message-bubble {msg.role}">
                             <div class="message-text">{msg.text}</div>
                         </div>
                     </template>
@@ -33,6 +32,5 @@
                 </div>
             </div>
         </div>
-    </lightning-card>
 </template>
 

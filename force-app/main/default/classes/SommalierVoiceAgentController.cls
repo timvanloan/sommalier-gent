@@ -1,58 +1,52 @@
 /**
- * Apex REST Controller for Sommalier Voice Agent
+ * Apex Controller for Sommalier Voice Agent
  * Handles Agentforce API integration for voice chat
  */
-@RestResource(urlMapping='/sommalier-voice-chat/*')
-global class SommalierVoiceAgentController {
+public class SommalierVoiceAgentController {
     
     // Agent ID from configuration
     private static final String AGENT_ID = '00DHu00000izUN6';
     
     /**
-     * POST endpoint to send message to Agentforce agent
+     * AuraEnabled method to send message to Agentforce agent
+     * Works with Experience Cloud sites
      */
-    @HttpPost
-    global static ResponseWrapper chat() {
+    @AuraEnabled(cacheable=false)
+    public static ChatResponse chat(String message, String conversationId) {
         try {
-            RestRequest req = RestContext.request;
-            RequestWrapper requestData = (RequestWrapper) JSON.deserialize(
-                req.requestBody.toString(), 
-                RequestWrapper.class
-            );
-            
-            if (String.isBlank(requestData.message)) {
-                return new ResponseWrapper(false, 'Message is required', null, null);
+            if (String.isBlank(message)) {
+                return new ChatResponse(false, 'Message is required', null, null);
             }
             
             // Get or create session
-            String sessionId = requestData.conversationId;
+            String sessionId = conversationId;
             if (String.isBlank(sessionId)) {
-                sessionId = createSession();
-            }
-            
-            if (String.isBlank(sessionId)) {
-                return new ResponseWrapper(false, 'Failed to create session', null, null);
+                String sessionResult = createSession();
+                if (String.isBlank(sessionResult)) {
+                    return new ChatResponse(false, 'Failed to create session. Check debug logs for details.', null, null);
+                }
+                sessionId = sessionResult;
             }
             
             // Send message to agent
-            String response = sendMessage(sessionId, requestData.message);
+            String response = sendMessage(sessionId, message);
             
             if (String.isBlank(response)) {
-                return new ResponseWrapper(false, 'No response from agent', sessionId, null);
+                return new ChatResponse(false, 'No response from agent after polling', sessionId, null);
             }
             
-            return new ResponseWrapper(true, null, sessionId, response);
+            return new ChatResponse(true, null, sessionId, response);
             
         } catch (Exception e) {
             System.debug('Error in chat: ' + e.getMessage());
             System.debug('Stack trace: ' + e.getStackTraceString());
-            return new ResponseWrapper(false, e.getMessage(), null, null);
+            return new ChatResponse(false, 'Error: ' + e.getMessage() + ' (Check debug logs)', null, null);
         }
     }
     
     /**
      * Create a new Agentforce conversation session
-     * Uses current user's session (no Named Credential required)
+     * Uses current user's session ID from the request context
      */
     private static String createSession() {
         try {
@@ -60,15 +54,22 @@ global class SommalierVoiceAgentController {
                                   String.valueOf(Math.random()).substring(2, 11);
             
             // Get the current user's session ID
-            String sessionId = UserInfo.getSessionId();
+            String userSessionId = UserInfo.getSessionId();
             String orgDomain = URL.getOrgDomainUrl().toExternalForm();
             
+            // Build the endpoint URL
+            String endpoint = orgDomain + '/services/data/v61.0/agentforce/agents/' + 
+                             AGENT_ID + '/sessions';
+            
+            System.debug('Creating session with endpoint: ' + endpoint);
+            System.debug('Session ID length: ' + (userSessionId != null ? userSessionId.length() : 0));
+            
             HttpRequest req = new HttpRequest();
-            req.setEndpoint(orgDomain + '/services/data/v61.0/agentforce/agents/' + 
-                           AGENT_ID + '/sessions');
+            req.setEndpoint(endpoint);
             req.setMethod('POST');
-            req.setHeader('Authorization', 'Bearer ' + sessionId);
+            req.setHeader('Authorization', 'Bearer ' + userSessionId);
             req.setHeader('Content-Type', 'application/json');
+            req.setTimeout(30000); // 30 second timeout
             req.setBody(JSON.serialize(new Map<String, Object>{
                 'bypassUser' => true,
                 'sessionKey' => sessionUuid
@@ -77,17 +78,24 @@ global class SommalierVoiceAgentController {
             Http http = new Http();
             HttpResponse res = http.send(req);
             
+            System.debug('Session creation response status: ' + res.getStatusCode());
+            System.debug('Session creation response body: ' + res.getBody());
+            
             if (res.getStatusCode() == 200 || res.getStatusCode() == 201) {
                 Map<String, Object> responseData = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
-                return (String) responseData.get('sessionId');
+                String agentSessionId = (String) responseData.get('sessionId');
+                System.debug('Created session ID: ' + agentSessionId);
+                return agentSessionId;
             } else {
                 System.debug('Session creation failed: ' + res.getStatusCode() + ' ' + res.getBody());
+                System.debug('Response headers: ' + res.getHeaderKeys());
                 return null;
             }
             
         } catch (Exception e) {
             System.debug('Error creating session: ' + e.getMessage());
             System.debug('Stack trace: ' + e.getStackTraceString());
+            System.debug('Exception type: ' + e.getTypeName());
             return null;
         }
     }
@@ -188,23 +196,15 @@ global class SommalierVoiceAgentController {
     }
     
     /**
-     * Request wrapper class
+     * Response wrapper class for AuraEnabled
      */
-    global class RequestWrapper {
-        public String message;
-        public String conversationId;
-    }
-    
-    /**
-     * Response wrapper class
-     */
-    global class ResponseWrapper {
-        public Boolean success;
-        public String error;
-        public String conversationId;
-        public String response;
+    public class ChatResponse {
+        @AuraEnabled public Boolean success;
+        @AuraEnabled public String error;
+        @AuraEnabled public String conversationId;
+        @AuraEnabled public String response;
         
-        public ResponseWrapper(Boolean success, String error, String conversationId, String response) {
+        public ChatResponse(Boolean success, String error, String conversationId, String response) {
             this.success = success;
             this.error = error;
             this.conversationId = conversationId;
