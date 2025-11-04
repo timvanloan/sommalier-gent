@@ -23,20 +23,6 @@
         }
 
         .voice-button {
-            pointer-events: auto !important;
-            cursor: pointer !important;
-        }
-
-        .status-text {
-            pointer-events: none;
-        }
-
-        .toggle-log {
-            pointer-events: auto !important;
-            cursor: pointer !important;
-        }
-
-        .voice-button {
             width: 120px;
             height: 120px;
             border-radius: 50%;
@@ -44,7 +30,7 @@
             background: rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            cursor: pointer;
+            cursor: pointer !important;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
@@ -52,6 +38,22 @@
             font-size: 48px;
             color: white;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            pointer-events: auto !important;
+            position: relative;
+            z-index: 10000 !important;
+        }
+
+        .status-text {
+            pointer-events: none;
+            position: relative;
+            z-index: 10001;
+        }
+
+        .toggle-log {
+            pointer-events: auto !important;
+            cursor: pointer !important;
+            position: relative;
+            z-index: 10000 !important;
         }
 
         .voice-button:hover {
@@ -139,7 +141,11 @@
             height: 100%;
             z-index: 1;
             opacity: 0.3;
-            pointer-events: none;
+            pointer-events: none !important;
+        }
+
+        #embedded-messaging-agent * {
+            pointer-events: none !important;
         }
 
         #embedded-messaging-agent iframe {
@@ -149,8 +155,17 @@
         }
 
         /* Allow interaction with input field when needed */
-        #embedded-messaging-agent iframe.active {
+        #embedded-messaging-agent.active,
+        #embedded-messaging-agent.active * {
             pointer-events: auto !important;
+        }
+
+        .embeddedServiceSidebar {
+            pointer-events: none !important;
+        }
+
+        .embeddedServiceSidebar * {
+            pointer-events: none !important;
         }
     </style>
 </head>
@@ -344,8 +359,11 @@
                     return;
                 }
 
-                // Temporarily enable pointer events on iframe for interaction
-                iframe.classList.add('active');
+                // Temporarily enable pointer events on agent container for interaction
+                const agentContainer = document.getElementById('embedded-messaging-agent');
+                if (agentContainer) {
+                    agentContainer.classList.add('active');
+                }
                 
                 // Wait for iframe to be ready
                 setTimeout(() => {
@@ -450,7 +468,10 @@
                                 
                                 // Disable pointer events again after interaction
                                 setTimeout(() => {
-                                    iframe.classList.remove('active');
+                                    const agentContainer = document.getElementById('embedded-messaging-agent');
+                                    if (agentContainer) {
+                                        agentContainer.classList.remove('active');
+                                    }
                                 }, 2000);
                             }, 500);
                         } else {
@@ -458,7 +479,10 @@
                             document.getElementById('statusText').textContent = 'Error: Could not find agent input field';
                             isProcessing = false;
                             updateUI('idle');
-                            iframe.classList.remove('active');
+                            const agentContainer = document.getElementById('embedded-messaging-agent');
+                            if (agentContainer) {
+                                agentContainer.classList.remove('active');
+                            }
                         }
                     } catch (err) {
                         console.error('Cross-origin error:', err);
@@ -468,7 +492,10 @@
                             message: userMessage
                         }, '*');
                         startMonitoringAgentResponse();
-                        iframe.classList.remove('active');
+                        const agentContainer = document.getElementById('embedded-messaging-agent');
+                        if (agentContainer) {
+                            agentContainer.classList.remove('active');
+                        }
                     }
                 }, 1000);
                 
