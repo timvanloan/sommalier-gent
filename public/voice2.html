@@ -413,6 +413,11 @@
             isProcessing = true;
             updateUI('processing');
             document.getElementById('statusText').textContent = 'Processing...';
+            
+            // Reset baseline tracking
+            initialBaselineSet = false;
+            lastFullText = '';
+            lastMessageCount = 0;
 
             try {
                 const iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
@@ -492,6 +497,7 @@
         let responseObserver = null;
         let lastMessageCount = 0;
         let lastFullText = '';
+        let initialBaselineSet = false;
 
         function monitorAgentResponse() {
             const sidebar = document.querySelector('.embeddedServiceSidebar');
@@ -503,9 +509,22 @@
                 responseObserver = null;
             }
 
-            // Start with a baseline of current text
+            // Wait a moment for the message to be sent, then set baseline
+            setTimeout(() => {
+                if (sidebar && !initialBaselineSet) {
+                    lastFullText = (sidebar.textContent || sidebar.innerText || '').trim();
+                    console.log('Baseline text set:', lastFullText.substring(0, 100));
+                    initialBaselineSet = true;
+                }
+            }, 2000);
+
+            // Start with a baseline of current text (but allow it to be updated)
             if (sidebar) {
-                lastFullText = (sidebar.textContent || sidebar.innerText || '').trim();
+                const currentText = (sidebar.textContent || sidebar.innerText || '').trim();
+                if (!initialBaselineSet || currentText.length > lastFullText.length) {
+                    lastFullText = currentText;
+                    console.log('Initial baseline:', lastFullText.substring(0, 100));
+                }
                 lastMessageCount = 0;
             }
 
@@ -514,35 +533,49 @@
                 responseObserver = new MutationObserver(() => {
                     const currentText = (sidebar.textContent || sidebar.innerText || '').trim();
                     
-                    // Check if text has grown significantly (new message)
-                    if (currentText && currentText.length > lastFullText.length + 15) {
+                    // Check if text has grown (even slightly - agent might be typing)
+                    if (currentText && currentText.length > lastFullText.length + 5) {
                         // Extract the new portion
                         const newText = currentText.substring(lastFullText.length).trim();
                         
-                        // Filter out common UI elements and check if it's substantial
+                        console.log('New text detected:', newText.substring(0, 100));
+                        
+                        // Filter out common UI elements
                         const filteredText = newText
                             .replace(/Type your message/gi, '')
                             .replace(/Send/gi, '')
+                            .replace(/Enter your message/gi, '')
                             .replace(/\s+/g, ' ')
                             .trim();
                         
-                        if (filteredText.length > 10 && filteredText.length < 5000) {
-                            // Check if this looks like a response (not just UI noise)
-                            const hasWords = filteredText.split(/\s+/).length >= 3;
+                        // More lenient - accept messages with 2+ words (was 3)
+                        if (filteredText.length > 5 && filteredText.length < 10000) {
+                            const words = filteredText.split(/\s+/).filter(w => w.length > 0);
+                            const hasWords = words.length >= 2;
+                            
+                            console.log('Filtered text:', filteredText.substring(0, 150), 'Words:', words.length);
                             
                             if (hasWords) {
-                                lastFullText = currentText;
+                                // Check if this is substantially different (not just a small update)
+                                const isSubstantial = filteredText.length >= 10 || words.length >= 3;
                                 
-                                // Clean up
-                                if (responseObserver) {
-                                    responseObserver.disconnect();
-                                    responseObserver = null;
+                                if (isSubstantial) {
+                                    lastFullText = currentText;
+                                    initialBaselineSet = true;
+                                    
+                                    console.log('Response captured:', filteredText.substring(0, 150));
+                                    
+                                    // Clean up
+                                    if (responseObserver) {
+                                        responseObserver.disconnect();
+                                        responseObserver = null;
+                                    }
+                                    
+                                    addToTranscript('assistant', filteredText);
+                                    speakWithOpenAI(filteredText);
+                                    isProcessing = false;
+                                    return;
                                 }
-                                
-                                addToTranscript('assistant', filteredText);
-                                speakWithOpenAI(filteredText);
-                                isProcessing = false;
-                                return;
                             }
                         }
                     }
@@ -601,18 +634,22 @@
                         }
                     }
                     
-                    // Check if we have new content
+                    // Check if we have new content (more lenient threshold)
                     const currentFullText = (sidebar.textContent || sidebar.innerText || '').trim();
-                    if (currentFullText.length > lastFullText.length + 15) {
+                    if (currentFullText.length > lastFullText.length + 5) {
                         const newText = currentFullText.substring(lastFullText.length).trim();
                         const filteredText = newText
                             .replace(/Type your message/gi, '')
                             .replace(/Send/gi, '')
+                            .replace(/Enter your message/gi, '')
                             .replace(/\s+/g, ' ')
                             .trim();
                         
-                        if (filteredText.length > 10 && filteredText.split(/\s+/).length >= 3) {
+                        const words = filteredText.split(/\s+/).filter(w => w.length > 0);
+                        if (filteredText.length > 5 && words.length >= 2) {
+                            console.log('Polling detected response:', filteredText.substring(0, 150));
                             lastFullText = currentFullText;
+                            initialBaselineSet = true;
                             clearInterval(pollInterval);
                             window.removeEventListener('message', messageHandler);
                             if (responseObserver) {
@@ -642,18 +679,22 @@
                                              msg.classList.contains('outgoing') ||
                                              msg.querySelector('[class*="user"]');
                                 
-                                if (!isUser && msgText.length > 10 && msgText.length < 5000) {
-                                    lastMessageCount = messages.length;
-                                    clearInterval(pollInterval);
-                                    window.removeEventListener('message', messageHandler);
-                                    if (responseObserver) {
-                                        responseObserver.disconnect();
-                                        responseObserver = null;
+                                if (!isUser && msgText.length > 5 && msgText.length < 10000) {
+                                    const words = msgText.split(/\s+/).filter(w => w.length > 0);
+                                    if (words.length >= 2) {
+                                        console.log('Iframe detected response:', msgText.substring(0, 150));
+                                        lastMessageCount = messages.length;
+                                        clearInterval(pollInterval);
+                                        window.removeEventListener('message', messageHandler);
+                                        if (responseObserver) {
+                                            responseObserver.disconnect();
+                                            responseObserver = null;
+                                        }
+                                        addToTranscript('assistant', msgText);
+                                        speakWithOpenAI(msgText);
+                                        isProcessing = false;
+                                        return;
                                     }
-                                    addToTranscript('assistant', msgText);
-                                    speakWithOpenAI(msgText);
-                                    isProcessing = false;
-                                    return;
                                 }
                             }
                             lastMessageCount = messages.length;
