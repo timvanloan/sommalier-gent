@@ -228,12 +228,24 @@
             pointer-events: none !important;
         }
 
+        /* Temporarily enable pointer events for interaction */
+        #embedded-messaging-agent.interactive,
+        #embedded-messaging-agent.interactive * {
+            pointer-events: auto !important;
+        }
+
         .embeddedServiceSidebar {
             pointer-events: none !important;
         }
 
         .embeddedServiceSidebar * {
             pointer-events: none !important;
+        }
+
+        /* Enable sidebar when needed for interaction */
+        .embeddedServiceSidebar.interactive,
+        .embeddedServiceSidebar.interactive * {
+            pointer-events: auto !important;
         }
 
         /* Scrollbar styling */
@@ -546,6 +558,42 @@
 
             // Store user message for filtering
             window.lastUserMessage = userMessage;
+            
+            // IMPORTANT: Since we can't programmatically send messages to the embedded agent,
+            // we need to make it visible and let the user interact with it manually
+            // OR we need to use a different integration approach
+            
+            // For now, let's make the agent semi-visible so user can see and interact
+            // We'll show it temporarily, user can type, and we'll detect responses
+            document.getElementById('statusText').textContent = 'Please type your message in the agent chat below';
+            
+            // Make agent visible but semi-transparent
+            const agentContainer = document.getElementById('embedded-messaging-agent');
+            const sidebarEl = document.querySelector('.embeddedServiceSidebar');
+            
+            if (agentContainer && sidebarEl) {
+                agentContainer.style.opacity = '0.3';
+                agentContainer.style.pointerEvents = 'auto';
+                sidebarEl.style.pointerEvents = 'auto';
+                
+                // Scroll to show the agent
+                setTimeout(() => {
+                    agentContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+            }
+            
+            // Show user message in our UI
+            addMessage('user', userMessage);
+            
+            // Start monitoring for response (user will type manually or we'll figure out another way)
+            monitorAgentResponse();
+            
+            // After 5 seconds, remind user or try alternative
+            setTimeout(() => {
+                if (isProcessing) {
+                    document.getElementById('statusText').textContent = 'Waiting for agent response... (check chat below)';
+                }
+            }, 5000);
 
             try {
                 // Try using embedded service API first (if available)
