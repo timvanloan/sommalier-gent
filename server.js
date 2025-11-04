@@ -97,6 +97,7 @@ async function getSalesforceAccessToken() {
     console.log('Trying Username-Password OAuth flow...');
     console.log(`Username: ${SALESFORCE_USERNAME}`);
     console.log(`Password length: ${password.length} (has token: ${!!SALESFORCE_SECURITY_TOKEN})`);
+    console.log(`Token URL: ${tokenUrl}`);
   } else {
     // Client Credentials flow
     params = new URLSearchParams({
@@ -105,6 +106,8 @@ async function getSalesforceAccessToken() {
       client_secret: SALESFORCE_CONSUMER_SECRET
     });
     console.log('Trying Client Credentials OAuth flow...');
+    console.log(`Token URL: ${tokenUrl}`);
+    console.log(`Consumer Key: ${SALESFORCE_CONSUMER_KEY.substring(0, 20)}...`);
   }
 
   try {
@@ -118,6 +121,14 @@ async function getSalesforceAccessToken() {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`OAuth Error Details: Status ${response.status}`);
+      console.error(`Error Response: ${errorText}`);
+      try {
+        const errorJson = JSON.parse(errorText);
+        console.error(`Parsed Error: ${JSON.stringify(errorJson, null, 2)}`);
+      } catch (e) {
+        // Not JSON, that's okay
+      }
       throw new Error(`OAuth token request failed: ${response.status} ${errorText}`);
     }
 
