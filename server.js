@@ -95,6 +95,8 @@ async function getSalesforceAccessToken() {
       password: password
     });
     console.log('Trying Username-Password OAuth flow...');
+    console.log(`Username: ${SALESFORCE_USERNAME}`);
+    console.log(`Password length: ${password.length} (has token: ${!!SALESFORCE_SECURITY_TOKEN})`);
   } else {
     // Client Credentials flow
     params = new URLSearchParams({
