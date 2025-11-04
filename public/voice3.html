@@ -559,164 +559,90 @@
             // Store user message for filtering
             window.lastUserMessage = userMessage;
             
-            // IMPORTANT: Since we can't programmatically send messages to the embedded agent,
-            // we need to make it visible and let the user interact with it manually
-            // OR we need to use a different integration approach
+            // Show user message in our UI
+            addMessage('user', userMessage);
             
-            // For now, let's make the agent semi-visible so user can see and interact
-            // We'll show it temporarily, user can type, and we'll detect responses
-            document.getElementById('statusText').textContent = 'Please type your message in the agent chat below';
-            
-            // Make agent visible but semi-transparent
+            // Make agent visible and interactive temporarily
             const agentContainer = document.getElementById('embedded-messaging-agent');
             const sidebarEl = document.querySelector('.embeddedServiceSidebar');
             
             if (agentContainer && sidebarEl) {
-                agentContainer.style.opacity = '0.3';
-                agentContainer.style.pointerEvents = 'auto';
-                sidebarEl.style.pointerEvents = 'auto';
+                // Make agent visible and interactive
+                agentContainer.classList.add('interactive');
+                sidebarEl.classList.add('interactive');
+                agentContainer.style.opacity = '0.5';
                 
-                // Scroll to show the agent
+                // Try to find and interact with input field using more aggressive selectors
                 setTimeout(() => {
-                    agentContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 100);
-            }
-            
-            // Show user message in our UI
-            addMessage('user', userMessage);
-            
-            // Start monitoring for response (user will type manually or we'll figure out another way)
-            monitorAgentResponse();
-            
-            // After 5 seconds, remind user or try alternative
-            setTimeout(() => {
-                if (isProcessing) {
-                    document.getElementById('statusText').textContent = 'Waiting for agent response... (check chat below)';
-                }
-            }, 5000);
-
-            try {
-                // Try using embedded service API first (if available)
-                if (window.embeddedservice_bootstrap && window.embeddedservice_bootstrap.utilAPI) {
-                    try {
-                        // Some embedded service APIs have a sendMessage method
-                        if (window.embeddedservice_bootstrap.utilAPI.sendMessage) {
-                            window.embeddedservice_bootstrap.utilAPI.sendMessage(userMessage);
-                            console.log('Message sent via embeddedservice_bootstrap.utilAPI.sendMessage');
-                            monitorAgentResponse();
-                            return;
-                        }
-                        
-                        // Try opening chat and sending via input field manipulation
-                        if (window.embeddedservice_bootstrap.utilAPI.launchChat) {
-                            window.embeddedservice_bootstrap.utilAPI.launchChat();
-                        }
-                    } catch (apiErr) {
-                        console.log('API method not available, trying alternative:', apiErr);
-                    }
-                }
-                
-                // Alternative: Try to find and interact with input field in sidebar
-                // The sidebar is in our origin, so we can access its DOM
-                const sidebarInput = sidebar ? sidebar.querySelector('input[type="text"], textarea, [contenteditable="true"], [role="textbox"]') : null;
-                
-                if (sidebarInput) {
-                    console.log('Found input in sidebar, attempting to send message');
-                    sidebarInput.focus();
+                    // Try multiple ways to find input
+                    const allInputs = sidebarEl.querySelectorAll('input, textarea, [contenteditable], [role="textbox"]');
+                    console.log('Found inputs:', allInputs.length);
                     
-                    // Clear and set value
-                    if (sidebarInput.tagName === 'INPUT' || sidebarInput.tagName === 'TEXTAREA') {
-                        sidebarInput.value = '';
-                        sidebarInput.value = userMessage;
-                    } else {
-                        sidebarInput.textContent = '';
-                        sidebarInput.textContent = userMessage;
-                    }
+                    let inputFound = false;
                     
-                    // Trigger input events
-                    ['input', 'change', 'keyup'].forEach(eventType => {
-                        const event = new Event(eventType, { bubbles: true, cancelable: true });
-                        sidebarInput.dispatchEvent(event);
-                    });
-                    
-                    // Try to find and click send button
-                    setTimeout(() => {
-                        const sendButton = sidebar.querySelector('button[type="submit"], button[aria-label*="Send"], button[aria-label*="send"], [class*="send"]');
-                        if (sendButton) {
-                            console.log('Found send button, clicking');
-                            sendButton.click();
-                        } else {
+                    for (const input of allInputs) {
+                        try {
+                            // Focus the input
+                            input.focus();
+                            
+                            // Try to set value
+                            if (input.tagName === 'INPUT' || input.tagName === 'TEXTAREA') {
+                                input.value = userMessage;
+                                input.dispatchEvent(new Event('input', { bubbles: true }));
+                                input.dispatchEvent(new Event('change', { bubbles: true }));
+                            } else {
+                                input.textContent = userMessage;
+                                input.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                            
                             // Try pressing Enter
-                            console.log('No send button found, simulating Enter key');
-                            const enterEvent = new KeyboardEvent('keydown', {
-                                key: 'Enter',
-                                code: 'Enter',
-                                keyCode: 13,
-                                which: 13,
-                                bubbles: true,
-                                cancelable: true
-                            });
-                            sidebarInput.dispatchEvent(enterEvent);
+                            setTimeout(() => {
+                                const enterEvent = new KeyboardEvent('keydown', {
+                                    key: 'Enter',
+                                    code: 'Enter',
+                                    keyCode: 13,
+                                    which: 13,
+                                    bubbles: true,
+                                    cancelable: true
+                                });
+                                input.dispatchEvent(enterEvent);
+                                
+                                const enterPress = new KeyboardEvent('keypress', {
+                                    key: 'Enter',
+                                    code: 'Enter',
+                                    keyCode: 13,
+                                    which: 13,
+                                    bubbles: true,
+                                    cancelable: true
+                                });
+                                input.dispatchEvent(enterPress);
+                                
+                                console.log('Simulated Enter key on input');
+                            }, 300);
                             
-                            const enterPress = new KeyboardEvent('keypress', {
-                                key: 'Enter',
-                                code: 'Enter',
-                                keyCode: 13,
-                                which: 13,
-                                bubbles: true,
-                                cancelable: true
-                            });
-                            sidebarInput.dispatchEvent(enterPress);
-                            
-                            const enterUp = new KeyboardEvent('keyup', {
-                                key: 'Enter',
-                                code: 'Enter',
-                                keyCode: 13,
-                                which: 13,
-                                bubbles: true,
-                                cancelable: true
-                            });
-                            sidebarInput.dispatchEvent(enterUp);
+                            inputFound = true;
+                            break;
+                        } catch (e) {
+                            console.log('Error with input:', e);
                         }
-                        
-                        monitorAgentResponse();
-                    }, 500);
-                    
-                    return;
-                }
-                
-                // Fallback: Try postMessage to iframe
-                const iframe = document.querySelector('#embedded-messaging-agent iframe, .embeddedServiceSidebar iframe');
-                if (iframe) {
-                    console.log('Using postMessage fallback');
-                    try {
-                        iframe.contentWindow.postMessage({
-                            type: 'sendMessage',
-                            message: userMessage
-                        }, '*');
-                        
-                        setTimeout(() => {
-                            iframe.contentWindow.postMessage({
-                                type: 'userMessage',
-                                text: userMessage
-                            }, '*');
-                        }, 100);
-                        
-                        monitorAgentResponse();
-                    } catch (err) {
-                        console.error('Error with postMessage:', err);
-                        monitorAgentResponse();
                     }
-                } else {
-                    throw new Error('Could not find agent interface');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                document.getElementById('statusText').textContent = 'Error: ' + error.message;
-                isProcessing = false;
-                updateUI('idle');
+                    
+                    if (!inputFound) {
+                        console.log('No input found, user will need to type manually');
+                        document.getElementById('statusText').textContent = 'Please type "' + userMessage + '" in the agent chat below';
+                    }
+                    
+                    // Hide agent again after interaction attempt
+                    setTimeout(() => {
+                        agentContainer.style.opacity = '0';
+                        agentContainer.classList.remove('interactive');
+                        sidebarEl.classList.remove('interactive');
+                    }, 2000);
+                }, 500);
             }
-        }
+            
+            // Start monitoring for response
+            monitorAgentResponse();
 
         function monitorAgentResponse() {
             const sidebar = document.querySelector('.embeddedServiceSidebar');
