@@ -338,39 +338,51 @@ app.get('/api/debug-agent', async (req, res) => {
     const base = `${SALESFORCE_DOMAIN_URL}/services/data/${ver}`;
     const results = {};
 
-    // List all available REST resources (shows what namespaces exist)
-    const resourcesRes = await fetch(base, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-    if (resourcesRes.ok) {
-      const resourceData = await resourcesRes.json();
-      // Filter for any AI/agent/einstein related keys
-      const keys = Object.keys(resourceData);
-      results.allResourceKeys = keys;
-      results.aiRelatedResources = keys.filter(k =>
-        k.toLowerCase().includes('agent') ||
-        k.toLowerCase().includes('einstein') ||
-        k.toLowerCase().includes('ai') ||
-        k.toLowerCase().includes('bot') ||
-        k.toLowerCase().includes('chat')
-      );
+    // Explore the /ai/ namespace
+    const aiRes = await fetch(`${base}/ai`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    results.aiNamespace = { status: aiRes.status, body: (await aiRes.text()).substring(0, 500) };
+
+    // Explore chatbot namespace
+    const cbRes = await fetch(`${base}/chatbot`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    results.chatbotNamespace = { status: cbRes.status, body: (await cbRes.text()).substring(0, 500) };
+
+    // Try chatbot/agents path
+    const cbAgentsRes = await fetch(`${base}/chatbot/agents`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    results.chatbotAgents = { status: cbAgentsRes.status, body: (await cbAgentsRes.text()).substring(0, 500) };
+
+    const sessionBody = JSON.stringify({
+      externalSessionKey: 'debug-' + Date.now(),
+      instanceConfig: { endpoint: SALESFORCE_DOMAIN_URL },
+      bypassUser: true
+    });
+
+    // Try session creation under chatbot and ai namespaces
+    const sessionPaths = [
+      `/chatbot/agents/${SALESFORCE_AGENT_ID}/sessions`,
+      `/ai/agents/${SALESFORCE_AGENT_ID}/sessions`,
+      `/ai/agent/sessions`,
+      `/chatbot/sessions`,
+    ];
+    results.sessionTests = {};
+    for (const p of sessionPaths) {
+      const r = await fetch(`${base}${p}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: sessionBody
+      });
+      results.sessionTests[p] = { status: r.status, body: (await r.text()).substring(0, 300) };
     }
 
-    // Try the token introspection to see what scopes we have
-    const introspectRes = await fetch(`${SALESFORCE_DOMAIN_URL}/services/oauth2/introspect`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `token=${accessToken}&client_id=${SALESFORCE_CONSUMER_KEY}&client_secret=${SALESFORCE_CONSUMER_SECRET}&token_type_hint=access_token`
+    // Also try SOQL to find Bot/Agent records
+    const soqlRes = await fetch(`${base}/query?q=${encodeURIComponent("SELECT Id, DeveloperName FROM BotDefinition LIMIT 5")}`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
     });
-    if (introspectRes.ok) {
-      const tokenData = await introspectRes.json();
-      results.tokenScopes = tokenData.scope;
-      results.tokenActive = tokenData.active;
-      results.tokenUsername = tokenData.username;
-    }
+    results.botDefinitions = { status: soqlRes.status, body: (await soqlRes.text()).substring(0, 500) };
 
     results.agentId = SALESFORCE_AGENT_ID;
     res.json(results);
   } catch (err) {
-    res.json({ error: err.message, stack: err.stack });
+    res.json({ error: err.message });
   }
 });
 
