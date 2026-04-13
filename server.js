@@ -330,6 +330,46 @@ app.get('/voice-agent', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'voice-agent.html'));
 });
 
+// Debug endpoint: find working API version and test agent endpoint
+app.get('/api/debug-agent', async (req, res) => {
+  try {
+    const accessToken = await getSalesforceAccessToken();
+    const results = {};
+
+    // Check available API versions
+    const versionsRes = await fetch(`${SALESFORCE_DOMAIN_URL}/services/data/`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    if (versionsRes.ok) {
+      const versions = await versionsRes.json();
+      results.availableVersions = versions.slice(-5).map(v => v.version);
+      results.latestVersion = versions[versions.length - 1].version;
+    }
+
+    // Try session creation with several API versions
+    const versionsToTry = ['v62.0', 'v63.0', 'v64.0', 'v65.0', 'v66.0'];
+    results.sessionTests = {};
+    for (const ver of versionsToTry) {
+      const url = `${SALESFORCE_DOMAIN_URL}/services/data/${ver}/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions`;
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          externalSessionKey: 'debug-' + Date.now(),
+          instanceConfig: { endpoint: SALESFORCE_DOMAIN_URL },
+          bypassUser: true
+        })
+      });
+      const body = await r.text();
+      results.sessionTests[ver] = { status: r.status, body: body.substring(0, 200) };
+    }
+
+    res.json(results);
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
 // API endpoint to initialize an Agentforce session and get the agent's opening message
 app.post('/api/agentforce-init', async (req, res) => {
   try {
@@ -354,7 +394,7 @@ app.post('/api/agentforce-init', async (req, res) => {
     const sessionResponse = await fetch(sessionUrl, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ externalSessionKey, instanceConfig: { endpoint: SALESFORCE_DOMAIN_URL } })
+      body: JSON.stringify({ externalSessionKey, instanceConfig: { endpoint: SALESFORCE_DOMAIN_URL }, bypassUser: true })
     });
 
     const sessionText = await sessionResponse.text();
