@@ -334,54 +334,43 @@ app.get('/voice-agent', (req, res) => {
 app.get('/api/debug-agent', async (req, res) => {
   try {
     const accessToken = await getSalesforceAccessToken();
-    const results = {};
     const ver = 'v66.0';
     const base = `${SALESFORCE_DOMAIN_URL}/services/data/${ver}`;
+    const results = {};
 
-    // Try listing agents via different possible paths
-    const pathsToGet = [
-      `${base}/agentforce/agents`,
-      `${base}/agentforce/`,
-      `${base}/connect/ai-agent/agents`,
-      `${base}/einstein/ai-agent/agents`,
-      `${base}/aiagent/agents`,
-    ];
-
-    results.getTests = {};
-    for (const url of pathsToGet) {
-      const r = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-      const body = await r.text();
-      results.getTests[url.replace(base, '')] = { status: r.status, body: body.substring(0, 300) };
+    // List all available REST resources (shows what namespaces exist)
+    const resourcesRes = await fetch(base, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    if (resourcesRes.ok) {
+      const resourceData = await resourcesRes.json();
+      // Filter for any AI/agent/einstein related keys
+      const keys = Object.keys(resourceData);
+      results.allResourceKeys = keys;
+      results.aiRelatedResources = keys.filter(k =>
+        k.toLowerCase().includes('agent') ||
+        k.toLowerCase().includes('einstein') ||
+        k.toLowerCase().includes('ai') ||
+        k.toLowerCase().includes('bot') ||
+        k.toLowerCase().includes('chat')
+      );
     }
 
-    // Try POST session with different paths
-    const sessionPaths = [
-      `${base}/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions`,
-      `${base}/connect/ai-agent/agents/${SALESFORCE_AGENT_ID}/sessions`,
-      `${base}/einstein/ai-agent/agents/${SALESFORCE_AGENT_ID}/sessions`,
-    ];
-
-    const sessionBody = JSON.stringify({
-      externalSessionKey: 'debug-' + Date.now(),
-      instanceConfig: { endpoint: SALESFORCE_DOMAIN_URL },
-      bypassUser: true
+    // Try the token introspection to see what scopes we have
+    const introspectRes = await fetch(`${SALESFORCE_DOMAIN_URL}/services/oauth2/introspect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `token=${accessToken}&client_id=${SALESFORCE_CONSUMER_KEY}&client_secret=${SALESFORCE_CONSUMER_SECRET}&token_type_hint=access_token`
     });
-
-    results.sessionTests = {};
-    for (const url of sessionPaths) {
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: sessionBody
-      });
-      const body = await r.text();
-      results.sessionTests[url.replace(base, '')] = { status: r.status, body: body.substring(0, 300) };
+    if (introspectRes.ok) {
+      const tokenData = await introspectRes.json();
+      results.tokenScopes = tokenData.scope;
+      results.tokenActive = tokenData.active;
+      results.tokenUsername = tokenData.username;
     }
 
     results.agentId = SALESFORCE_AGENT_ID;
     res.json(results);
   } catch (err) {
-    res.json({ error: err.message });
+    res.json({ error: err.message, stack: err.stack });
   }
 });
 
