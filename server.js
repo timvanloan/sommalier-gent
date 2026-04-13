@@ -335,35 +335,50 @@ app.get('/api/debug-agent', async (req, res) => {
   try {
     const accessToken = await getSalesforceAccessToken();
     const results = {};
+    const ver = 'v66.0';
+    const base = `${SALESFORCE_DOMAIN_URL}/services/data/${ver}`;
 
-    // Check available API versions
-    const versionsRes = await fetch(`${SALESFORCE_DOMAIN_URL}/services/data/`, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
-    if (versionsRes.ok) {
-      const versions = await versionsRes.json();
-      results.availableVersions = versions.slice(-5).map(v => v.version);
-      results.latestVersion = versions[versions.length - 1].version;
+    // Try listing agents via different possible paths
+    const pathsToGet = [
+      `${base}/agentforce/agents`,
+      `${base}/agentforce/`,
+      `${base}/connect/ai-agent/agents`,
+      `${base}/einstein/ai-agent/agents`,
+      `${base}/aiagent/agents`,
+    ];
+
+    results.getTests = {};
+    for (const url of pathsToGet) {
+      const r = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+      const body = await r.text();
+      results.getTests[url.replace(base, '')] = { status: r.status, body: body.substring(0, 300) };
     }
 
-    // Try session creation with several API versions
-    const versionsToTry = ['v62.0', 'v63.0', 'v64.0', 'v65.0', 'v66.0'];
+    // Try POST session with different paths
+    const sessionPaths = [
+      `${base}/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions`,
+      `${base}/connect/ai-agent/agents/${SALESFORCE_AGENT_ID}/sessions`,
+      `${base}/einstein/ai-agent/agents/${SALESFORCE_AGENT_ID}/sessions`,
+    ];
+
+    const sessionBody = JSON.stringify({
+      externalSessionKey: 'debug-' + Date.now(),
+      instanceConfig: { endpoint: SALESFORCE_DOMAIN_URL },
+      bypassUser: true
+    });
+
     results.sessionTests = {};
-    for (const ver of versionsToTry) {
-      const url = `${SALESFORCE_DOMAIN_URL}/services/data/${ver}/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions`;
+    for (const url of sessionPaths) {
       const r = await fetch(url, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          externalSessionKey: 'debug-' + Date.now(),
-          instanceConfig: { endpoint: SALESFORCE_DOMAIN_URL },
-          bypassUser: true
-        })
+        body: sessionBody
       });
       const body = await r.text();
-      results.sessionTests[ver] = { status: r.status, body: body.substring(0, 200) };
+      results.sessionTests[url.replace(base, '')] = { status: r.status, body: body.substring(0, 300) };
     }
 
+    results.agentId = SALESFORCE_AGENT_ID;
     res.json(results);
   } catch (err) {
     res.json({ error: err.message });
