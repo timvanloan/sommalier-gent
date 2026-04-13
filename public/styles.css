@@ -104,17 +104,19 @@ body {
 }
 
 /* Force sidebar to be positioned in our modal if it exists */
+/* Width/height set to 66.7% so that zoom: 1.5 scales it back to ~100% */
 .embeddedServiceSidebar {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 66.7% !important;
+    height: 66.7% !important;
     border-radius: 15px !important;
     overflow: hidden !important;
     z-index: 1001 !important;
+    zoom: 1.5 !important;
 }
 
 /* When sidebar is in our modal container, ensure it fills */
@@ -122,12 +124,13 @@ body {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 66.7% !important;
+    height: 66.7% !important;
     border-radius: 15px !important;
     overflow: hidden !important;
+    zoom: 1.5 !important;
 }
 
 /* Style the embedded messaging container when it's in our modal */
