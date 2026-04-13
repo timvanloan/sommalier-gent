@@ -361,15 +361,20 @@ app.post('/api/agentforce-chat', async (req, res) => {
       });
     }
 
-    // Try multiple API endpoint patterns
     try {
-      // Method 1: Try Agentforce API endpoint (correct structure)
-      // Create session first
+      const API_VERSION = 'v62.0';
+
+      // Step 1: Create session if we don't have one
       let sessionId = conversationId;
+      let sequenceId = 1;
+
       if (!sessionId) {
-        const sessionUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions`;
-        const sessionUuid = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        
+        const sessionUrl = `${SALESFORCE_DOMAIN_URL}/services/data/${API_VERSION}/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions`;
+        const externalSessionKey = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+
         const sessionResponse = await fetch(sessionUrl, {
           method: 'POST',
           headers: {
@@ -377,131 +382,83 @@ app.post('/api/agentforce-chat', async (req, res) => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            bypassUser: true,
-            sessionKey: sessionUuid
+            externalSessionKey,
+            instanceConfig: {
+              endpoint: SALESFORCE_DOMAIN_URL
+            }
           })
         });
+
+        const sessionText = await sessionResponse.text();
+        console.log('Session response:', sessionResponse.status, sessionText.substring(0, 300));
 
         if (sessionResponse.ok) {
-          const sessionData = await sessionResponse.json();
+          const sessionData = JSON.parse(sessionText);
           sessionId = sessionData.sessionId || sessionData.id;
-          console.log('✅ Created conversation session:', sessionId);
+          console.log('✅ Created session:', sessionId);
         } else {
-          const errorText = await sessionResponse.text();
-          console.log('Session creation failed:', sessionResponse.status, errorText);
-        }
-      }
-
-      // Method 2: Send message using Agentforce API
-      if (sessionId) {
-        const messageUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions/${sessionId}/messages`;
-        
-        const messageResponse = await fetch(messageUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            input: {
-              text: message
-            }
-          })
-        });
-
-        if (messageResponse.ok) {
-          const messageData = await messageResponse.json();
-          console.log('Message sent, response:', JSON.stringify(messageData).substring(0, 200));
-          
-          // Agent response is typically in the same response
-          if (messageData.output && messageData.output.text) {
-            return res.json({ 
-              response: messageData.output.text,
-              conversationId: sessionId
-            });
-          }
-          
-          // Or it might be in a different field
-          if (messageData.response || messageData.message || messageData.text) {
-            return res.json({ 
-              response: messageData.response || messageData.message || messageData.text,
-              conversationId: sessionId
-            });
-          }
-          
-          // Wait and poll for response
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          
-          // Get latest messages
-          const messagesResponse = await fetch(messageUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            }
+          console.log('Session creation failed:', sessionResponse.status, sessionText);
+          return res.status(500).json({
+            error: 'Unable to communicate with Agentforce API',
+            details: `Session creation failed: ${sessionResponse.status} ${sessionText}`
           });
-
-          if (messagesResponse.ok) {
-            const messagesData = await messagesResponse.json();
-            const messages = messagesData.records || messagesData.messages || messagesData || [];
-            
-            // Find the latest agent message
-            let agentResponse = null;
-            if (Array.isArray(messages)) {
-              const agentMessages = messages
-                .filter(m => (m.Sender__c === 'Agent' || m.sender === 'agent' || m.role === 'assistant' || m.type === 'agent'))
-                .sort((a, b) => new Date(b.CreatedDate || b.createdDate || 0) - new Date(a.CreatedDate || a.createdDate || 0));
-              
-              if (agentMessages.length > 0) {
-                agentResponse = agentMessages[0].Message__c || agentMessages[0].text || agentMessages[0].message || agentMessages[0].content || agentMessages[0].output?.text;
-              }
-            }
-            
-            if (agentResponse) {
-              return res.json({ 
-                response: agentResponse,
-                conversationId: sessionId
-              });
-            }
-          }
-        } else {
-          const errorText = await messageResponse.text();
-          console.log('Message sending failed:', messageResponse.status, errorText);
         }
       }
 
-      // Method 3: Try alternative endpoint structure
-      const altUrl = `${SALESFORCE_DOMAIN_URL}/services/data/v61.0/agentforce/agents/${SALESFORCE_AGENT_ID}/chat`;
-      const altResponse = await fetch(altUrl, {
+      // Step 2: Send message
+      const messageUrl = `${SALESFORCE_DOMAIN_URL}/services/data/${API_VERSION}/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions/${sessionId}/messages`;
+
+      const messageResponse = await fetch(messageUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          message: message,
-          sessionId: conversationId
+          message: {
+            sequenceId,
+            type: 'Text',
+            text: message
+          },
+          variables: []
         })
       });
 
-      if (altResponse.ok) {
-        const altData = await altResponse.json();
-        return res.json({ 
-          response: altData.response || altData.message || altData.text || altData.output?.text,
-          conversationId: altData.sessionId || conversationId
+      const messageText = await messageResponse.text();
+      console.log('Message response:', messageResponse.status, messageText.substring(0, 500));
+
+      if (!messageResponse.ok) {
+        return res.status(500).json({
+          error: 'Unable to communicate with Agentforce API',
+          details: `Message failed: ${messageResponse.status} ${messageText}`
         });
       }
 
-      // If all methods fail, return error with details
-      return res.status(500).json({ 
+      const messageData = JSON.parse(messageText);
+
+      // Extract agent reply from messages array
+      const messages = messageData.messages || [];
+      const agentTexts = messages
+        .filter(m => m.type === 'Text' && m.text)
+        .map(m => m.text);
+
+      const agentReply = agentTexts.join(' ').trim();
+
+      if (agentReply) {
+        return res.json({ response: agentReply, conversationId: sessionId });
+      }
+
+      // Log full response for debugging if no text found
+      console.log('Full message response:', JSON.stringify(messageData));
+      return res.status(500).json({
         error: 'Unable to communicate with Agentforce API',
-        details: 'Tried multiple API endpoints but none responded successfully',
-        note: 'Please check Salesforce Agentforce API documentation. You may need to verify your Connected App is associated with the agent and has the correct OAuth scopes.'
+        details: 'Agent returned no text response',
+        raw: messageData
       });
 
     } catch (error) {
       console.error('Error communicating with agent:', error);
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Failed to communicate with agent',
         details: error.message
       });
@@ -520,6 +477,8 @@ app.post('/api/tts', async (req, res) => {
     if (!text) {
       return res.status(400).json({ error: 'Text is required' });
     }
+
+    const ttsVoice = voice || 'alloy';
     
     const ttsVoice = voice || 'alloy';
     
