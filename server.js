@@ -330,10 +330,77 @@ app.get('/voice-agent', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'voice-agent.html'));
 });
 
+// API endpoint to initialize an Agentforce session and get the agent's opening message
+app.post('/api/agentforce-init', async (req, res) => {
+  try {
+    if (!SALESFORCE_CONSUMER_KEY || !SALESFORCE_CONSUMER_SECRET) {
+      return res.status(500).json({ error: 'Salesforce credentials not configured' });
+    }
+
+    let accessToken;
+    try {
+      accessToken = await getSalesforceAccessToken();
+    } catch (error) {
+      return res.status(500).json({ error: 'Salesforce authentication failed', details: error.message });
+    }
+
+    const API_VERSION = 'v62.0';
+    const sessionUrl = `${SALESFORCE_DOMAIN_URL}/services/data/${API_VERSION}/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions`;
+    const externalSessionKey = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+
+    const sessionResponse = await fetch(sessionUrl, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ externalSessionKey, instanceConfig: { endpoint: SALESFORCE_DOMAIN_URL } })
+    });
+
+    const sessionText = await sessionResponse.text();
+    console.log('Init session response:', sessionResponse.status, sessionText.substring(0, 500));
+
+    if (!sessionResponse.ok) {
+      return res.status(500).json({ error: 'Failed to create session', details: sessionText });
+    }
+
+    const sessionData = JSON.parse(sessionText);
+    const sessionId = sessionData.sessionId || sessionData.id;
+
+    // Check if session creation returned initial messages
+    const initMessages = sessionData.messages || [];
+    const initTexts = initMessages.filter(m => m.type === 'Text' && m.text).map(m => m.text);
+
+    if (initTexts.length > 0) {
+      return res.json({ sessionId, greeting: initTexts.join(' ') });
+    }
+
+    // No initial message returned — send a greeting trigger to get the agent's opening
+    const messageUrl = `${SALESFORCE_DOMAIN_URL}/services/data/${API_VERSION}/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions/${sessionId}/messages`;
+    const greetResponse = await fetch(messageUrl, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: { sequenceId: 1, type: 'Text', text: 'Hello' }, variables: [] })
+    });
+
+    if (greetResponse.ok) {
+      const greetData = await greetResponse.json();
+      const greetTexts = (greetData.messages || []).filter(m => m.type === 'Text' && m.text).map(m => m.text);
+      return res.json({ sessionId, greeting: greetTexts.join(' ') || null });
+    }
+
+    return res.json({ sessionId, greeting: null });
+
+  } catch (error) {
+    console.error('Init error:', error);
+    res.status(500).json({ error: 'Failed to initialize agent', details: error.message });
+  }
+});
+
 // API endpoint to get Agentforce agent response
 app.post('/api/agentforce-chat', async (req, res) => {
   try {
-    const { message, conversationId } = req.body;
+    const { message, conversationId, sequenceId } = req.body;
     
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
@@ -407,6 +474,7 @@ app.post('/api/agentforce-chat', async (req, res) => {
 
       // Step 2: Send message
       const messageUrl = `${SALESFORCE_DOMAIN_URL}/services/data/${API_VERSION}/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions/${sessionId}/messages`;
+      const msgSeqId = sequenceId || 1;
 
       const messageResponse = await fetch(messageUrl, {
         method: 'POST',
@@ -416,7 +484,7 @@ app.post('/api/agentforce-chat', async (req, res) => {
         },
         body: JSON.stringify({
           message: {
-            sequenceId,
+            sequenceId: msgSeqId,
             type: 'Text',
             text: message
           },

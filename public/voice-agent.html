@@ -427,9 +427,10 @@
     <script>
     (function() {
         const VOICE = 'nova';
-        const GREETING = "Good evening. I'm your Sommelier-gent, here to guide you through the world of wine. Whether you're exploring a new region, pairing with a meal, or simply curious — I'm at your service. How may I assist you today?";
+        const FALLBACK_GREETING = "Hello and welcome to the Agentforce Sommelier-gent Experience! We would love to pair you with the perfect wine. Please tell me your name, title and company so we can get started.";
 
         let conversationId = null;
+        let sequenceId = 1;
         let mediaRecorder = null;
         let audioChunks = [];
         let isRecording = false;
@@ -567,11 +568,13 @@
             setStatus('processing', 'Thinking...');
             showThinking();
 
+            sequenceId++;
+
             try {
                 const res = await fetch('/api/agentforce-chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message, conversationId })
+                    body: JSON.stringify({ message, conversationId, sequenceId })
                 });
 
                 const data = await res.json();
@@ -792,10 +795,22 @@
         // ── Init ───────────────────────────────────────────────────────────────
         async function init() {
             useBrowserSTT = initBrowserSTT();
+            setStatus('', 'Connecting to your sommelier...');
 
-            // Play greeting
-            addBubble('agent', GREETING);
-            await speak(GREETING);
+            try {
+                const res = await fetch('/api/agentforce-init', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+                const data = await res.json();
+
+                if (data.sessionId) conversationId = data.sessionId;
+
+                const greeting = data.greeting || FALLBACK_GREETING;
+                addBubble('agent', greeting);
+                await speak(greeting);
+            } catch (err) {
+                console.warn('Init failed, using fallback greeting:', err);
+                addBubble('agent', FALLBACK_GREETING);
+                await speak(FALLBACK_GREETING);
+            }
 
             micBtn.disabled = false;
             setStatus('', 'Tap the mic to speak, or type below');
