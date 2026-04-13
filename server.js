@@ -325,6 +325,11 @@ app.get('/voice3', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'voice3.html'));
 });
 
+// Route for voice-agent page
+app.get('/voice-agent', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'voice-agent.html'));
+});
+
 // API endpoint to get Agentforce agent response
 app.post('/api/agentforce-chat', async (req, res) => {
   try {
@@ -510,16 +515,18 @@ app.post('/api/agentforce-chat', async (req, res) => {
 // OpenAI TTS endpoint for voice synthesis
 app.post('/api/tts', async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, voice } = req.body;
     
     if (!text) {
       return res.status(400).json({ error: 'Text is required' });
     }
     
+    const ttsVoice = voice || 'alloy';
+    
     // Use OpenAI TTS API
     const mp3 = await openai.audio.speech.create({
-      model: 'tts-1',
-      voice: 'alloy',
+      model: 'tts-1-hd',
+      voice: ttsVoice,
       input: text,
     });
     
