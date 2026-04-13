@@ -548,8 +548,6 @@ app.post('/api/tts', async (req, res) => {
 
     const ttsVoice = voice || 'alloy';
     
-    const ttsVoice = voice || 'alloy';
-    
     // Use OpenAI TTS API
     const mp3 = await openai.audio.speech.create({
       model: 'tts-1-hd',
