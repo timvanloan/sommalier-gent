@@ -294,15 +294,26 @@
             40%            { transform: translateY(-6px); opacity: 1; }
         }
 
-        /* Hidden widget host — off-screen but alive */
+        /* Widget host — rendered in the viewport (opacity:0) so the iframe
+           gets a proper rendering context. off-screen causes ESW_APP_READY_EVENT
+           RPC timeouts which prevent onEmbeddedMessagingReady from ever firing. */
         #sf-widget-host {
             position: fixed;
-            top: -9999px;
-            left: -9999px;
+            bottom: 0;
+            right: 0;
             width: 420px;
             height: 680px;
-            overflow: hidden;
-            z-index: -1;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;  /* behind our voice UI (z-index 10) but rendered */
+        }
+
+        /* Suppress any widget chrome that renders outside our host div */
+        .embeddedMessagingConversationButton,
+        .embeddedServiceHelpButton,
+        [id^="embedded-messaging"],
+        [class*="embeddedMessagingMinimizedBubble"] {
+            display: none !important;
         }
     </style>
 </head>
@@ -627,7 +638,21 @@
                 embeddedservice_bootstrap.utilAPI &&
                 typeof embeddedservice_bootstrap.utilAPI.sendTextMessage === 'function') {
                 try {
-                    embeddedservice_bootstrap.utilAPI.sendTextMessage(text);
+                    const result = embeddedservice_bootstrap.utilAPI.sendTextMessage(text);
+                    // Catch async rejection (fires when widget isn't ready yet)
+                    if (result && typeof result.catch === 'function') {
+                        result.catch(function (e) {
+                            console.warn('[VA] sendTextMessage async rejection:', e.message || e);
+                            // Abort the pending response wait so we fail fast
+                            if (sfWidget._pendingResolve) {
+                                clearTimeout(sfWidget._pendingTimer);
+                                var res = sfWidget._pendingResolve;
+                                sfWidget._pendingResolve = null;
+                                sfWidget._pendingTimer = null;
+                                res(null);
+                            }
+                        });
+                    }
                     console.log('[VA] Sent via utilAPI.sendTextMessage');
                     resolve(true);
                     return;
@@ -1120,12 +1145,12 @@
             useBrowserSTT = initBrowserSTT();
             setStatus('', 'Connecting to your sommelier…');
 
-            // Wait up to 10 s for the SF widget to be ready
+            // Wait up to 20 s for the SF widget to fully initialize
             await new Promise(resolve => {
                 let waited = 0;
                 const check = setInterval(() => {
                     waited += 200;
-                    if (sfWidget.ready || sfWidget.chatOpen || waited >= 10000) {
+                    if (sfWidget.ready || sfWidget.chatOpen || waited >= 20000) {
                         clearInterval(check);
                         resolve();
                     }
