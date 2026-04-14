@@ -5,11 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Salesforce Sommelier-gent</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             min-height: 100vh;
@@ -21,19 +17,17 @@
             overflow: hidden;
         }
 
-        /* Background */
         .bg {
             position: fixed;
             inset: 0;
             background:
-                radial-gradient(ellipse at 20% 50%, rgba(120, 40, 60, 0.25) 0%, transparent 60%),
-                radial-gradient(ellipse at 80% 20%, rgba(60, 20, 80, 0.3) 0%, transparent 60%),
-                radial-gradient(ellipse at 50% 100%, rgba(30, 15, 50, 0.4) 0%, transparent 70%);
+                radial-gradient(ellipse at 20% 50%, rgba(120,40,60,0.25) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(60,20,80,0.3) 0%, transparent 60%),
+                radial-gradient(ellipse at 50% 100%, rgba(30,15,50,0.4) 0%, transparent 70%);
             pointer-events: none;
             z-index: 0;
         }
 
-        /* Header */
         .header {
             position: relative;
             z-index: 10;
@@ -51,12 +45,11 @@
 
         .header .subtitle {
             font-size: 0.75rem;
-            color: rgba(200, 170, 130, 0.5);
+            color: rgba(200,170,130,0.5);
             letter-spacing: 0.2em;
             margin-top: 4px;
         }
 
-        /* Main layout */
         .main {
             position: relative;
             z-index: 10;
@@ -70,7 +63,6 @@
             overflow: hidden;
         }
 
-        /* Conversation area */
         .conversation {
             flex: 1;
             overflow-y: auto;
@@ -79,17 +71,12 @@
             flex-direction: column;
             gap: 12px;
             scrollbar-width: thin;
-            scrollbar-color: rgba(201, 169, 110, 0.2) transparent;
+            scrollbar-color: rgba(201,169,110,0.2) transparent;
         }
 
-        .conversation::-webkit-scrollbar {
-            width: 4px;
-        }
+        .conversation::-webkit-scrollbar { width: 4px; }
         .conversation::-webkit-scrollbar-track { background: transparent; }
-        .conversation::-webkit-scrollbar-thumb {
-            background: rgba(201, 169, 110, 0.2);
-            border-radius: 2px;
-        }
+        .conversation::-webkit-scrollbar-thumb { background: rgba(201,169,110,0.2); border-radius: 2px; }
 
         .bubble {
             max-width: 82%;
@@ -106,16 +93,16 @@
         }
 
         .bubble.agent {
-            background: rgba(201, 169, 110, 0.12);
-            border: 1px solid rgba(201, 169, 110, 0.2);
+            background: rgba(201,169,110,0.12);
+            border: 1px solid rgba(201,169,110,0.2);
             align-self: flex-start;
             border-bottom-left-radius: 4px;
             color: #e8dcc8;
         }
 
         .bubble.user {
-            background: rgba(120, 60, 160, 0.25);
-            border: 1px solid rgba(160, 90, 200, 0.25);
+            background: rgba(120,60,160,0.25);
+            border: 1px solid rgba(160,90,200,0.25);
             align-self: flex-end;
             border-bottom-right-radius: 4px;
             color: #e8dcc8;
@@ -129,18 +116,16 @@
             margin-bottom: 4px;
         }
 
-        /* Transcript preview */
         .transcript-preview {
             min-height: 22px;
             text-align: center;
             font-size: 0.8rem;
-            color: rgba(201, 169, 110, 0.6);
+            color: rgba(201,169,110,0.6);
             font-style: italic;
             padding: 2px 0 6px;
             letter-spacing: 0.03em;
         }
 
-        /* Controls */
         .controls {
             padding: 12px 0 20px;
             display: flex;
@@ -149,14 +134,13 @@
             gap: 16px;
         }
 
-        /* Status bar */
         .status-bar {
             display: flex;
             align-items: center;
             gap: 8px;
             font-size: 0.8rem;
             letter-spacing: 0.08em;
-            color: rgba(201, 169, 110, 0.6);
+            color: rgba(201,169,110,0.6);
             min-height: 20px;
         }
 
@@ -164,26 +148,25 @@
             width: 7px;
             height: 7px;
             border-radius: 50%;
-            background: rgba(201, 169, 110, 0.4);
+            background: rgba(201,169,110,0.4);
             transition: background 0.3s;
         }
 
-        .status-dot.listening { background: #e05060; animation: pulse 1s infinite; }
+        .status-dot.listening  { background: #e05060; animation: pulse 1s infinite; }
         .status-dot.processing { background: #e0a030; animation: pulse 0.6s infinite; }
-        .status-dot.speaking { background: #40c080; animation: pulse 0.8s infinite; }
+        .status-dot.speaking   { background: #40c080; animation: pulse 0.8s infinite; }
 
         @keyframes pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(0.8); }
+            50%       { opacity: 0.5; transform: scale(0.8); }
         }
 
-        /* Mic button */
         .mic-btn {
             width: 80px;
             height: 80px;
             border-radius: 50%;
-            border: 2px solid rgba(201, 169, 110, 0.4);
-            background: rgba(201, 169, 110, 0.08);
+            border: 2px solid rgba(201,169,110,0.4);
+            background: rgba(201,169,110,0.08);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -193,52 +176,28 @@
             flex-shrink: 0;
         }
 
-        .mic-btn:hover {
-            border-color: rgba(201, 169, 110, 0.7);
-            background: rgba(201, 169, 110, 0.14);
-        }
+        .mic-btn:hover   { border-color: rgba(201,169,110,0.7); background: rgba(201,169,110,0.14); }
+        .mic-btn:active,
+        .mic-btn.active  { border-color: #e05060; background: rgba(224,80,96,0.18); transform: scale(0.96); }
+        .mic-btn.speaking-state   { border-color: #40c080; background: rgba(64,192,128,0.12); cursor: default; }
+        .mic-btn.processing-state { border-color: #e0a030; background: rgba(224,160,48,0.12); cursor: default; }
 
-        .mic-btn:active, .mic-btn.active {
-            border-color: #e05060;
-            background: rgba(224, 80, 96, 0.18);
-            transform: scale(0.96);
-        }
-
-        .mic-btn.speaking-state {
-            border-color: #40c080;
-            background: rgba(64, 192, 128, 0.12);
-            cursor: default;
-        }
-
-        .mic-btn.processing-state {
-            border-color: #e0a030;
-            background: rgba(224, 160, 48, 0.12);
-            cursor: default;
-        }
-
-        .mic-btn svg {
-            width: 32px;
-            height: 32px;
-            fill: rgba(201, 169, 110, 0.8);
-            transition: fill 0.2s;
-        }
-
-        .mic-btn.active svg { fill: #e05060; }
-        .mic-btn.speaking-state svg { fill: #40c080; }
+        .mic-btn svg { width: 32px; height: 32px; fill: rgba(201,169,110,0.8); transition: fill 0.2s; }
+        .mic-btn.active svg          { fill: #e05060; }
+        .mic-btn.speaking-state svg  { fill: #40c080; }
         .mic-btn.processing-state svg { fill: #e0a030; }
 
-        /* Ring animation when listening */
         .mic-btn::before {
             content: '';
             position: absolute;
             inset: -8px;
             border-radius: 50%;
-            border: 2px solid rgba(224, 80, 96, 0);
+            border: 2px solid rgba(224,80,96,0);
             transition: border-color 0.3s;
         }
 
         .mic-btn.active::before {
-            border-color: rgba(224, 80, 96, 0.4);
+            border-color: rgba(224,80,96,0.4);
             animation: ring 1.2s ease-out infinite;
         }
 
@@ -247,21 +206,8 @@
             100% { transform: scale(1.5); opacity: 0; }
         }
 
-        /* Waveform for speaking state */
-        .waveform {
-            display: flex;
-            align-items: center;
-            gap: 3px;
-            height: 32px;
-        }
-
-        .wave-bar {
-            width: 3px;
-            border-radius: 2px;
-            background: #40c080;
-            animation: wave 0.8s ease-in-out infinite;
-        }
-
+        .waveform { display: flex; align-items: center; gap: 3px; height: 32px; }
+        .wave-bar { width: 3px; border-radius: 2px; background: #40c080; animation: wave 0.8s ease-in-out infinite; }
         .wave-bar:nth-child(1) { height: 10px; animation-delay: 0s; }
         .wave-bar:nth-child(2) { height: 20px; animation-delay: 0.1s; }
         .wave-bar:nth-child(3) { height: 28px; animation-delay: 0.2s; }
@@ -273,32 +219,23 @@
             50%       { transform: scaleY(0.4); }
         }
 
-        /* Spinner */
         .spinner {
             width: 28px;
             height: 28px;
-            border: 2px solid rgba(224, 160, 48, 0.2);
+            border: 2px solid rgba(224,160,48,0.2);
             border-top-color: #e0a030;
             border-radius: 50%;
             animation: spin 0.7s linear infinite;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Text input row */
-        .text-row {
-            display: flex;
-            width: 100%;
-            gap: 10px;
-            align-items: flex-end;
-        }
+        .text-row { display: flex; width: 100%; gap: 10px; align-items: flex-end; }
 
         .text-input {
             flex: 1;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(201, 169, 110, 0.2);
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(201,169,110,0.2);
             border-radius: 24px;
             padding: 10px 18px;
             color: #e8dcc8;
@@ -312,15 +249,15 @@
             line-height: 1.4;
         }
 
-        .text-input::placeholder { color: rgba(201, 169, 110, 0.35); }
-        .text-input:focus { border-color: rgba(201, 169, 110, 0.5); }
+        .text-input::placeholder { color: rgba(201,169,110,0.35); }
+        .text-input:focus         { border-color: rgba(201,169,110,0.5); }
 
         .send-btn {
             width: 42px;
             height: 42px;
             border-radius: 50%;
-            border: 1px solid rgba(201, 169, 110, 0.3);
-            background: rgba(201, 169, 110, 0.1);
+            border: 1px solid rgba(201,169,110,0.3);
+            background: rgba(201,169,110,0.1);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -329,38 +266,23 @@
             transition: all 0.2s;
         }
 
-        .send-btn:hover {
-            background: rgba(201, 169, 110, 0.2);
-            border-color: rgba(201, 169, 110, 0.6);
-        }
+        .send-btn:hover { background: rgba(201,169,110,0.2); border-color: rgba(201,169,110,0.6); }
+        .send-btn svg   { width: 18px; height: 18px; fill: rgba(201,169,110,0.8); }
 
-        .send-btn svg {
-            width: 18px;
-            height: 18px;
-            fill: rgba(201, 169, 110, 0.8);
-        }
-
-        /* Divider hint */
         .hint {
             font-size: 0.7rem;
-            color: rgba(201, 169, 110, 0.3);
+            color: rgba(201,169,110,0.3);
             letter-spacing: 0.1em;
             text-align: center;
         }
 
-        /* Loading dots for agent thinking */
-        .thinking-bubble {
-            display: flex;
-            gap: 5px;
-            align-items: center;
-            padding: 14px 18px;
-        }
+        .thinking-bubble { display: flex; gap: 5px; align-items: center; padding: 14px 18px; }
 
         .dot {
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: rgba(201, 169, 110, 0.5);
+            background: rgba(201,169,110,0.5);
             animation: bounce 1.2s ease-in-out infinite;
         }
 
@@ -371,9 +293,25 @@
             0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
             40%            { transform: translateY(-6px); opacity: 1; }
         }
+
+        /* Hidden widget host — off-screen but alive */
+        #sf-widget-host {
+            position: fixed;
+            top: -9999px;
+            left: -9999px;
+            width: 420px;
+            height: 680px;
+            overflow: hidden;
+            z-index: -1;
+        }
     </style>
 </head>
 <body>
+
+    <!-- Salesforce Embedded Messaging widget (hidden, live) -->
+    <div id="sf-widget-host"></div>
+
+    <!-- Voice UI -->
     <div class="bg"></div>
 
     <div class="header">
@@ -383,16 +321,15 @@
 
     <div class="main">
         <div class="conversation" id="conversation"></div>
-
         <div class="transcript-preview" id="transcriptPreview"></div>
 
         <div class="controls">
             <div class="status-bar">
                 <div class="status-dot" id="statusDot"></div>
-                <span id="statusText">Initializing your sommelier...</span>
+                <span id="statusText">Connecting to your sommelier...</span>
             </div>
 
-            <button class="mic-btn" id="micBtn" title="Hold to speak" disabled>
+            <button class="mic-btn" id="micBtn" title="Tap to speak" disabled>
                 <svg id="micIcon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-2 16.93A8.001 8.001 0 0 1 4.07 11H6.1a6 6 0 0 0 11.8 0h2.03A8.001 8.001 0 0 1 14 17.93V21h3v2H7v-2h3v-3.07z"/>
                 </svg>
@@ -424,34 +361,354 @@
         </div>
     </div>
 
+    <!-- ── Salesforce Embedded Messaging bootstrap ────────────────────────── -->
     <script>
-    (function() {
+    'use strict';
+
+    var sfWidget = {
+        ready: false,
+        chatOpen: false,
+        // Queued pending-response resolver
+        _pendingResolve: null,
+        _pendingTimer: null,
+        // Message snapshot for change-detection fallback
+        _lastAgentMsgText: '',
+        _seenMsgCount: 0,
+        _initialGreetingDone: false,
+        _greetingResolve: null,
+    };
+
+    /* ── Kick off the widget ─────────────────────────────────────────── */
+    function initEmbeddedMessaging() {
+        try {
+            var host = document.getElementById('sf-widget-host');
+            if (host && window.embeddedservice_bootstrap) {
+                embeddedservice_bootstrap.settings.targetElement = host;
+            }
+            embeddedservice_bootstrap.settings.language = 'en_US';
+            embeddedservice_bootstrap.init(
+                '00DHu00000izUN6',
+                'SommalierGent_1',
+                'https://storm-11c5bf736713cf.my.site.com/ESWSommalierGent1762152842517',
+                { scrt2URL: 'https://storm-11c5bf736713cf.my.salesforce-scrt.com' }
+            );
+        } catch (err) {
+            console.error('[VA] Widget init error:', err);
+        }
+    }
+
+    window.addEventListener('onEmbeddedMessagingReady', function () {
+        sfWidget.ready = true;
+        console.log('[VA] Widget ready');
+
+        setTimeout(function () {
+            try {
+                if (window.embeddedservice_bootstrap &&
+                    embeddedservice_bootstrap.utilAPI &&
+                    embeddedservice_bootstrap.utilAPI.launchChat) {
+                    embeddedservice_bootstrap.utilAPI.launchChat();
+                    sfWidget.chatOpen = true;
+                    console.log('[VA] Chat launched');
+                    _startResponseMonitor();
+                }
+            } catch (e) {
+                console.warn('[VA] launchChat error:', e);
+            }
+        }, 800);
+    });
+
+    /* ── Listen for any postMessages from the SF widget iframe ──────── */
+    window.addEventListener('message', function (ev) {
+        try {
+            var d = ev.data;
+            if (!d || typeof d !== 'object') return;
+
+            // Log for debugging (only short messages)
+            var s = JSON.stringify(d);
+            if (s.length < 600) console.log('[VA] postMsg:', s);
+
+            // Extract agent-text from known SF SCRT2 message shapes
+            var text = _extractAgentText(d);
+            if (text) {
+                console.log('[VA] Agent reply via postMessage:', text.substring(0, 120));
+                _resolveAgentResponse(text);
+            }
+        } catch (ignore) {}
+    });
+
+    function _extractAgentText(d) {
+        // SF SCRT2 fires various shapes — check the common ones
+        var candidates = [];
+
+        // Shape: { method: 'messageReceived', payload: { text: '...' } }
+        if (d.method === 'messageReceived' && d.payload) {
+            var p = d.payload;
+            candidates.push(p.text, p.message, p.body, p.content);
+        }
+
+        // Shape: { type/event, message/text/body }
+        if (d.type === 'AGENT_MESSAGE' || d.type === 'BOT_MESSAGE' ||
+            d.type === 'agentMessage'   || d.type === 'botMessage'  ||
+            d.event === 'onNewMessage') {
+            candidates.push(d.text, d.message, d.body, d.content,
+                            d.payload && d.payload.text);
+        }
+
+        // Catch-all: top-level string fields that look like content
+        ['agentResponse','botResponse','reply','response','content','text','message']
+            .forEach(function(k){ if (typeof d[k] === 'string') candidates.push(d[k]); });
+
+        return candidates.find(function(c){
+            return typeof c === 'string' && c.trim().length > 15;
+        }) || null;
+    }
+
+    /* ── MutationObserver fallback — watches widget iframe DOM ──────── */
+    function _startResponseMonitor() {
+        var host = document.getElementById('sf-widget-host');
+        if (!host) return;
+
+        var observer = new MutationObserver(function () {
+            _checkIframeForNewMessages();
+        });
+
+        // Observe host for iframe insertion and subtree changes
+        observer.observe(host, { childList: true, subtree: true, characterData: true });
+        // Also observe body in case SF renders its sidebar outside our host
+        observer.observe(document.body, { childList: true });
+
+        console.log('[VA] Response monitor started');
+    }
+
+    function _checkIframeForNewMessages() {
+        // Try to find the SF iframe
+        var iframe = document.querySelector('#sf-widget-host iframe') ||
+                     document.querySelector('iframe[class*="embedded"], iframe[id*="embedded"]') ||
+                     document.querySelector('.embeddedServiceSidebar iframe');
+
+        if (iframe) {
+            try {
+                // Same-origin attempt
+                var doc = iframe.contentDocument || iframe.contentWindow.document;
+                var msgEls = doc.querySelectorAll(
+                    '[class*="message"],[class*="Message"],[role="article"],' +
+                    '[class*="bubble"],[class*="Bubble"],[class*="chatMessage"]'
+                );
+
+                if (msgEls.length > sfWidget._seenMsgCount) {
+                    for (var i = sfWidget._seenMsgCount; i < msgEls.length; i++) {
+                        var el = msgEls[i];
+                        var txt = (el.textContent || '').trim();
+
+                        // Skip if it looks like a user message
+                        var isUser = el.classList.contains('user') ||
+                                     el.classList.contains('sent') ||
+                                     el.classList.contains('outgoing') ||
+                                     !!el.closest('[class*="outbound"], [class*="outgoing"], [class*="user-msg"]');
+
+                        if (!isUser && txt.length > 15 && txt !== sfWidget._lastAgentMsgText) {
+                            sfWidget._lastAgentMsgText = txt;
+                            sfWidget._seenMsgCount = msgEls.length;
+                            console.log('[VA] Agent reply via iframe DOM:', txt.substring(0, 120));
+                            _resolveAgentResponse(txt);
+                            return;
+                        }
+                    }
+                    sfWidget._seenMsgCount = msgEls.length;
+                }
+            } catch (crossOriginErr) {
+                // Cross-origin: fall back to sidebar text diff
+                _checkSidebarTextDiff();
+            }
+        } else {
+            _checkSidebarTextDiff();
+        }
+    }
+
+    function _checkSidebarTextDiff() {
+        var sidebar = document.querySelector('.embeddedServiceSidebar') ||
+                      document.querySelector('[class*="embedded-messaging"]') ||
+                      document.getElementById('sf-widget-host');
+        if (!sidebar) return;
+
+        var current = (sidebar.textContent || '').trim();
+        if (current.length > sfWidget._lastAgentMsgText.length + 30) {
+            var delta = current.substring(sfWidget._lastAgentMsgText.length).trim();
+            delta = _cleanWidgetChrome(delta);
+            if (delta && delta.length > 20) {
+                sfWidget._lastAgentMsgText = current;
+                console.log('[VA] Agent reply via sidebar diff:', delta.substring(0, 120));
+                _resolveAgentResponse(delta);
+            }
+        }
+    }
+
+    function _cleanWidgetChrome(text) {
+        // Strip common SF widget UI strings
+        var uiChromeStrings = [
+            'Type a message', 'Send', 'Minimize', 'Close', 'End Chat',
+            'Loading', 'Attach File', 'Emoji', 'Start Over'
+        ];
+        uiChromeStrings.forEach(function (s) {
+            text = text.replace(new RegExp('\\b' + s + '\\b', 'gi'), '');
+        });
+        return text.replace(/\s+/g, ' ').trim();
+    }
+
+    /* ── Public: send text to widget ───────────────────────────────── */
+    function sfSendMessage(text) {
+        return new Promise(function (resolve) {
+            // Method 1 — utilAPI.sendTextMessage (SF SCRT2 v58+)
+            if (window.embeddedservice_bootstrap &&
+                embeddedservice_bootstrap.utilAPI &&
+                typeof embeddedservice_bootstrap.utilAPI.sendTextMessage === 'function') {
+                try {
+                    embeddedservice_bootstrap.utilAPI.sendTextMessage(text);
+                    console.log('[VA] Sent via utilAPI.sendTextMessage');
+                    resolve(true);
+                    return;
+                } catch (e) {
+                    console.warn('[VA] utilAPI.sendTextMessage failed:', e);
+                }
+            }
+
+            // Method 2 — inject into the widget's iframe input field
+            var iframes = Array.from(document.querySelectorAll('iframe'));
+            var sfIframe = iframes.find(function (f) {
+                return (f.src || '').match(/salesforce|force\.com|my\.site\.com|scrt/i);
+            }) || document.querySelector('#sf-widget-host iframe');
+
+            if (sfIframe) {
+                try {
+                    var doc = sfIframe.contentDocument || sfIframe.contentWindow.document;
+                    var inputEl = doc.querySelector('input[type="text"], textarea, [contenteditable="true"], [role="textbox"]');
+
+                    if (inputEl) {
+                        // React-friendly native setter
+                        try {
+                            var proto = Object.getPrototypeOf(inputEl);
+                            var descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
+                            if (descriptor && descriptor.set) descriptor.set.call(inputEl, text);
+                            else inputEl.value = text;
+                        } catch (e) { inputEl.value = text; }
+
+                        ['focus','input','change'].forEach(function (type) {
+                            inputEl.dispatchEvent(new Event(type, { bubbles: true }));
+                        });
+
+                        setTimeout(function () {
+                            var btn = doc.querySelector(
+                                'button[type="submit"], [aria-label*="Send" i], [title*="Send" i], button[class*="send" i]'
+                            );
+                            if (btn) {
+                                btn.click();
+                            } else {
+                                ['keydown','keypress','keyup'].forEach(function (t) {
+                                    inputEl.dispatchEvent(new KeyboardEvent(t, {
+                                        key: 'Enter', code: 'Enter', keyCode: 13,
+                                        which: 13, bubbles: true, cancelable: true
+                                    }));
+                                });
+                            }
+                            resolve(true);
+                        }, 350);
+                        return;
+                    }
+                } catch (crossOriginErr) {
+                    console.warn('[VA] Cross-origin iframe — trying postMessage');
+                    sfIframe.contentWindow.postMessage(
+                        { type: 'sendMessage', action: 'send', message: text, text: text }, '*'
+                    );
+                    resolve(true);
+                    return;
+                }
+            }
+
+            console.warn('[VA] Could not find SF widget to send message');
+            resolve(false);
+        });
+    }
+
+    /* ── Public: wait for next agent response ───────────────────────── */
+    function sfWaitForResponse(timeoutMs) {
+        return new Promise(function (resolve) {
+            sfWidget._pendingResolve = resolve;
+            sfWidget._pendingTimer = setTimeout(function () {
+                if (sfWidget._pendingResolve) {
+                    sfWidget._pendingResolve = null;
+                    resolve(null);
+                }
+            }, timeoutMs || 30000);
+        });
+    }
+
+    function _resolveAgentResponse(text) {
+        // Don't resolve the same text twice in quick succession
+        if (text === sfWidget._lastResolvedText) return;
+        sfWidget._lastResolvedText = text;
+
+        if (sfWidget._pendingResolve) {
+            clearTimeout(sfWidget._pendingTimer);
+            var res = sfWidget._pendingResolve;
+            sfWidget._pendingResolve = null;
+            sfWidget._pendingTimer = null;
+            res(text);
+        } else if (!sfWidget._initialGreetingDone) {
+            sfWidget._initialGreetingDone = true;
+            if (sfWidget._greetingResolve) {
+                var gr = sfWidget._greetingResolve;
+                sfWidget._greetingResolve = null;
+                gr(text);
+            }
+        }
+    }
+
+    function sfWaitForGreeting(timeoutMs) {
+        return new Promise(function (resolve) {
+            if (sfWidget._initialGreetingDone) { resolve(null); return; }
+            sfWidget._greetingResolve = resolve;
+            setTimeout(function () {
+                if (sfWidget._greetingResolve) {
+                    sfWidget._greetingResolve = null;
+                    resolve(null);
+                }
+            }, timeoutMs || 12000);
+        });
+    }
+    </script>
+    <script src="https://storm-11c5bf736713cf.my.site.com/ESWSommalierGent1762152842517/assets/js/bootstrap.min.js"
+            onload="initEmbeddedMessaging()"></script>
+
+    <!-- ── Voice interaction ─────────────────────────────────────────────── -->
+    <script>
+    (function () {
+        'use strict';
+
         const VOICE = 'nova';
-        const FALLBACK_GREETING = "Hello and welcome to the Agentforce Sommelier-gent Experience! We would love to pair you with the perfect wine. Please tell me your name, title and company so we can get started.";
+        const FALLBACK_GREETING = 'Hello, and welcome to the Agentforce Sommelier-gent experience. I\'d love to pair you with the perfect wine. To get started, please tell me your name, title, and company.';
 
-        let conversationId = null;
-        let sequenceId = 1;
         let mediaRecorder = null;
-        let audioChunks = [];
-        let isRecording = false;
-        let isSpeaking = false;
-        let isProcessing = false;
-        let currentAudio = null;
-        let recognition = null;
+        let audioChunks   = [];
+        let isRecording   = false;
+        let isSpeaking    = false;
+        let isProcessing  = false;
+        let currentAudio  = null;
+        let recognition   = null;
         let useBrowserSTT = false;
+        let greetingSpoken = false;
 
-        const conversationEl = document.getElementById('conversation');
-        const micBtn = document.getElementById('micBtn');
-        const micIcon = document.getElementById('micIcon');
-        const waveform = document.getElementById('waveform');
-        const spinner = document.getElementById('spinner');
-        const statusDot = document.getElementById('statusDot');
-        const statusText = document.getElementById('statusText');
+        const conversationEl   = document.getElementById('conversation');
+        const micBtn           = document.getElementById('micBtn');
+        const micIcon          = document.getElementById('micIcon');
+        const waveformEl       = document.getElementById('waveform');
+        const spinnerEl        = document.getElementById('spinner');
+        const statusDot        = document.getElementById('statusDot');
+        const statusText       = document.getElementById('statusText');
         const transcriptPreview = document.getElementById('transcriptPreview');
-        const textInput = document.getElementById('textInput');
-        const sendBtn = document.getElementById('sendBtn');
+        const textInputEl      = document.getElementById('textInput');
+        const sendBtnEl        = document.getElementById('sendBtn');
 
-        // ── State helpers ──────────────────────────────────────────────────────
+        /* ── UI helpers ──────────────────────────────────────────────── */
         function setStatus(state, text) {
             statusDot.className = 'status-dot ' + (state || '');
             statusText.textContent = text;
@@ -459,37 +716,38 @@
 
         function setMicState(state) {
             micBtn.className = 'mic-btn';
-            micIcon.style.display = 'block';
-            waveform.style.display = 'none';
-            spinner.style.display = 'none';
+            micIcon.style.display  = 'block';
+            waveformEl.style.display = 'none';
+            spinnerEl.style.display  = 'none';
 
             if (state === 'listening') {
                 micBtn.classList.add('active');
             } else if (state === 'speaking') {
                 micBtn.classList.add('speaking-state');
-                micIcon.style.display = 'none';
-                waveform.style.display = 'flex';
+                micIcon.style.display   = 'none';
+                waveformEl.style.display = 'flex';
             } else if (state === 'processing') {
                 micBtn.classList.add('processing-state');
-                micIcon.style.display = 'none';
-                spinner.style.display = 'block';
+                micIcon.style.display  = 'none';
+                spinnerEl.style.display = 'block';
             }
         }
 
-        // ── Conversation bubbles ───────────────────────────────────────────────
         function addBubble(role, text) {
             const wrap = document.createElement('div');
             wrap.className = 'bubble ' + role;
+
             const label = document.createElement('div');
             label.className = 'speaker';
             label.textContent = role === 'agent' ? 'Sommelier' : 'You';
+
             const content = document.createElement('div');
             content.textContent = text;
+
             wrap.appendChild(label);
             wrap.appendChild(content);
             conversationEl.appendChild(wrap);
             conversationEl.scrollTop = conversationEl.scrollHeight;
-            return wrap;
         }
 
         function showThinking() {
@@ -510,12 +768,9 @@
             if (el) el.remove();
         }
 
-        // ── TTS ────────────────────────────────────────────────────────────────
+        /* ── TTS (OpenAI Nova) ───────────────────────────────────────── */
         async function speak(text) {
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio = null;
-            }
+            if (currentAudio) { currentAudio.pause(); currentAudio = null; }
             isSpeaking = true;
             setMicState('speaking');
             setStatus('speaking', 'Speaking...');
@@ -527,10 +782,10 @@
                     body: JSON.stringify({ text, voice: VOICE })
                 });
 
-                if (!res.ok) throw new Error('TTS failed');
+                if (!res.ok) throw new Error('TTS request failed: ' + res.status);
 
                 const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
+                const url  = URL.createObjectURL(blob);
                 currentAudio = new Audio(url);
 
                 await new Promise((resolve, reject) => {
@@ -538,29 +793,26 @@
                     currentAudio.onerror = reject;
                     currentAudio.play().catch(reject);
                 });
+
+                URL.revokeObjectURL(url);
             } catch (err) {
-                console.warn('TTS error, falling back to browser synthesis:', err);
-                await browserSpeak(text);
+                console.warn('[VA] TTS error, falling back to browser synthesis:', err);
+                await new Promise(resolve => {
+                    const utt = new SpeechSynthesisUtterance(text);
+                    utt.rate  = 0.95;
+                    utt.pitch = 1;
+                    utt.onend = resolve;
+                    window.speechSynthesis.speak(utt);
+                });
             } finally {
-                URL.revokeObjectURL(currentAudio?.src);
                 currentAudio = null;
-                isSpeaking = false;
-                setMicState('idle');
+                isSpeaking   = false;
+                setMicState('');
                 setStatus('', 'Tap the mic to speak, or type below');
             }
         }
 
-        function browserSpeak(text) {
-            return new Promise(resolve => {
-                const utt = new SpeechSynthesisUtterance(text);
-                utt.rate = 0.95;
-                utt.pitch = 1;
-                utt.onend = resolve;
-                window.speechSynthesis.speak(utt);
-            });
-        }
-
-        // ── Agentforce chat ────────────────────────────────────────────────────
+        /* ── Send to agent ───────────────────────────────────────────── */
         async function sendToAgent(message) {
             isProcessing = true;
             micBtn.disabled = true;
@@ -568,70 +820,65 @@
             setStatus('processing', 'Thinking...');
             showThinking();
 
-            sequenceId++;
+            let reply = null;
 
             try {
-                const res = await fetch('/api/agentforce-chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message, conversationId, sequenceId })
-                });
+                // Primary: use the live SF embedded widget
+                const sent = await sfSendMessage(message);
 
-                const data = await res.json();
-                removeThinking();
+                if (sent) {
+                    reply = await sfWaitForResponse(30000);
+                    if (reply) console.log('[VA] Got reply from widget:', reply.substring(0, 80));
+                }
 
-                if (data.conversationId) conversationId = data.conversationId;
-
-                const reply = data.response || data.error || 'I apologize, I could not process that request.';
-                addBubble('agent', reply);
-                isProcessing = false;
-                micBtn.disabled = false;
-
-                await speak(reply);
+                // Fallback: Agentforce REST API (in case it gets enabled later)
+                if (!reply) {
+                    console.log('[VA] Widget did not respond; trying REST API fallback…');
+                    const res = await fetch('/api/agentforce-chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message })
+                    });
+                    const data = await res.json();
+                    reply = data.response || null;
+                }
             } catch (err) {
-                removeThinking();
-                console.error('Agent error:', err);
-                const errMsg = 'I seem to be having trouble connecting. Please try again.';
-                addBubble('agent', errMsg);
-                isProcessing = false;
-                micBtn.disabled = false;
-                await speak(errMsg);
+                console.error('[VA] sendToAgent error:', err);
             }
+
+            removeThinking();
+
+            const responseText = reply || "I'm having a little trouble connecting right now. Please try again in a moment.";
+            addBubble('agent', responseText);
+            isProcessing = false;
+            micBtn.disabled = false;
+
+            await speak(responseText);
         }
 
-        // ── Speech recognition / recording ─────────────────────────────────────
+        /* ── Speech recognition (Whisper preferred, browser fallback) ─ */
         function initBrowserSTT() {
             const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SR) return false;
+
             recognition = new SR();
-            recognition.continuous = false;
+            recognition.continuous    = false;
             recognition.interimResults = true;
             recognition.lang = 'en-US';
 
             recognition.onresult = (e) => {
-                let interim = '';
-                let final = '';
+                let interim = '', final = '';
                 for (let i = e.resultIndex; i < e.results.length; i++) {
                     const t = e.results[i][0].transcript;
                     if (e.results[i].isFinal) final += t;
                     else interim += t;
                 }
                 transcriptPreview.textContent = final || interim;
-                if (final) {
-                    stopRecording();
-                    handleTranscript(final.trim());
-                }
+                if (final) { stopRecording(); handleTranscript(final.trim()); }
             };
 
-            recognition.onerror = (e) => {
-                console.warn('STT error:', e.error);
-                stopRecording();
-                setStatus('', 'Tap the mic to speak, or type below');
-            };
-
-            recognition.onend = () => {
-                if (isRecording) stopRecording();
-            };
+            recognition.onerror = () => { stopRecording(); setStatus('', 'Tap the mic to speak, or type below'); };
+            recognition.onend   = () => { if (isRecording) stopRecording(); };
 
             return true;
         }
@@ -641,19 +888,21 @@
             isRecording = true;
             transcriptPreview.textContent = '';
             setMicState('listening');
-            setStatus('listening', 'Listening...');
+            setStatus('listening', 'Listening…');
 
             if (useBrowserSTT && recognition) {
-                try { recognition.start(); return; } catch(e) { /* fall through */ }
+                try { recognition.start(); return; } catch (e) { /* fall through */ }
             }
 
-            // MediaRecorder path (Whisper)
+            // MediaRecorder → Whisper
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                audioChunks = [];
+                audioChunks  = [];
+
                 const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
                     ? 'audio/webm;codecs=opus'
                     : 'audio/webm';
+
                 mediaRecorder = new MediaRecorder(stream, { mimeType });
                 mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
                 mediaRecorder.onstop = async () => {
@@ -662,10 +911,10 @@
                 };
                 mediaRecorder.start();
             } catch (err) {
-                console.error('Mic access error:', err);
+                console.error('[VA] Mic access error:', err);
                 isRecording = false;
-                setStatus('', 'Microphone access denied');
-                setMicState('idle');
+                setStatus('', 'Microphone access denied — please allow microphone access');
+                setMicState('');
             }
         }
 
@@ -675,7 +924,7 @@
             micBtn.classList.remove('active');
 
             if (useBrowserSTT && recognition) {
-                try { recognition.stop(); } catch(e) {}
+                try { recognition.stop(); } catch (e) {}
                 return;
             }
 
@@ -687,42 +936,42 @@
         async function transcribeAndSend() {
             if (audioChunks.length === 0) {
                 setStatus('', 'Tap the mic to speak, or type below');
-                setMicState('idle');
+                setMicState('');
                 return;
             }
 
             setMicState('processing');
-            setStatus('processing', 'Transcribing...');
+            setStatus('processing', 'Transcribing…');
 
             try {
-                const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                const blob   = new Blob(audioChunks, { type: 'audio/webm' });
                 const reader = new FileReader();
                 const base64 = await new Promise((resolve, reject) => {
-                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onload  = () => resolve(reader.result.split(',')[1]);
                     reader.onerror = reject;
                     reader.readAsDataURL(blob);
                 });
 
-                const res = await fetch('/api/transcribe', {
+                const res  = await fetch('/api/transcribe', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ audio: base64 })
                 });
-
                 const data = await res.json();
                 const transcript = data.text?.trim();
+
                 transcriptPreview.textContent = '';
 
                 if (transcript) {
                     handleTranscript(transcript);
                 } else {
-                    setStatus('', "I didn't catch that. Try again.");
-                    setMicState('idle');
+                    setStatus('', "I didn't catch that — please try again");
+                    setMicState('');
                 }
             } catch (err) {
-                console.error('Transcription error:', err);
-                setStatus('', 'Transcription failed. Please try again.');
-                setMicState('idle');
+                console.error('[VA] Transcription error:', err);
+                setStatus('', 'Transcription failed — please try again');
+                setMicState('');
             }
         }
 
@@ -732,92 +981,93 @@
             sendToAgent(text);
         }
 
-        // ── Mic button events ──────────────────────────────────────────────────
+        /* ── Mic button events ───────────────────────────────────────── */
         let holdTimer = null;
-        let tapMode = false;
 
         micBtn.addEventListener('pointerdown', (e) => {
             e.preventDefault();
-            if (isSpeaking || isProcessing) return;
-            holdTimer = setTimeout(() => {
-                tapMode = false;
-                startRecording();
-            }, 80);
+            if (isSpeaking || isProcessing || micBtn.disabled) return;
+            holdTimer = setTimeout(() => startRecording(), 80);
         });
 
         micBtn.addEventListener('pointerup', (e) => {
             e.preventDefault();
             clearTimeout(holdTimer);
-            if (isRecording && !tapMode) {
-                stopRecording();
-            } else if (!isRecording && !isSpeaking && !isProcessing) {
-                tapMode = true;
-                if (!isRecording) startRecording();
-                else stopRecording();
-            }
+            if (isRecording)                      stopRecording();
+            else if (!isSpeaking && !isProcessing) startRecording();
         });
 
         micBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            if (!isRecording && !isSpeaking && !isProcessing) {
-                tapMode = true;
-                startRecording();
-            } else if (isRecording) {
-                stopRecording();
-            }
+            if (micBtn.disabled) return;
+            if (!isRecording && !isSpeaking && !isProcessing) startRecording();
+            else if (isRecording) stopRecording();
         });
 
-        // ── Text input ─────────────────────────────────────────────────────────
+        /* ── Text input ──────────────────────────────────────────────── */
         function submitText() {
-            const msg = textInput.value.trim();
+            const msg = textInputEl.value.trim();
             if (!msg || isProcessing) return;
-            textInput.value = '';
-            textInput.style.height = 'auto';
+            textInputEl.value = '';
+            textInputEl.style.height = 'auto';
             if (isSpeaking && currentAudio) { currentAudio.pause(); isSpeaking = false; }
             addBubble('user', msg);
             sendToAgent(msg);
         }
 
-        sendBtn.addEventListener('click', submitText);
+        sendBtnEl.addEventListener('click', submitText);
 
-        textInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                submitText();
-            }
+        textInputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitText(); }
         });
 
-        textInput.addEventListener('input', () => {
-            textInput.style.height = 'auto';
-            textInput.style.height = Math.min(textInput.scrollHeight, 100) + 'px';
+        textInputEl.addEventListener('input', () => {
+            textInputEl.style.height = 'auto';
+            textInputEl.style.height = Math.min(textInputEl.scrollHeight, 100) + 'px';
         });
 
-        // ── Init ───────────────────────────────────────────────────────────────
+        /* ── Initialise ──────────────────────────────────────────────── */
         async function init() {
             useBrowserSTT = initBrowserSTT();
-            setStatus('', 'Connecting to your sommelier...');
+            setStatus('', 'Connecting to your sommelier…');
 
-            try {
-                const res = await fetch('/api/agentforce-init', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-                const data = await res.json();
+            // Wait up to 10 s for the SF widget to be ready
+            await new Promise(resolve => {
+                let waited = 0;
+                const check = setInterval(() => {
+                    waited += 200;
+                    if (sfWidget.ready || sfWidget.chatOpen || waited >= 10000) {
+                        clearInterval(check);
+                        resolve();
+                    }
+                }, 200);
+            });
 
-                if (data.sessionId) conversationId = data.sessionId;
+            // Try to capture the real agent greeting from the widget
+            // (the widget fires its opening message shortly after chat is launched)
+            const widgetGreeting = await sfWaitForGreeting(10000);
+            const greeting = widgetGreeting || FALLBACK_GREETING;
 
-                const greeting = data.greeting || FALLBACK_GREETING;
-                addBubble('agent', greeting);
-                await speak(greeting);
-            } catch (err) {
-                console.warn('Init failed, using fallback greeting:', err);
-                addBubble('agent', FALLBACK_GREETING);
-                await speak(FALLBACK_GREETING);
-            }
+            addBubble('agent', greeting);
 
+            // Browser autoplay policy blocks audio without a prior user gesture.
+            // We display the greeting and enable the mic button first.
+            // On the very first mic press we'll speak the greeting.
             micBtn.disabled = false;
-            setStatus('', 'Tap the mic to speak, or type below');
+            setStatus('', 'Tap the mic to begin — Nova will greet you');
+
+            // Speak the greeting on the first user interaction
+            micBtn.addEventListener('click', async function onFirstTap() {
+                if (!greetingSpoken && !isSpeaking && !isProcessing) {
+                    greetingSpoken = true;
+                    await speak(greeting);
+                }
+            }, { once: true });
         }
 
         init();
     })();
     </script>
+
 </body>
 </html>
