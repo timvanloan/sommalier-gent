@@ -378,6 +378,70 @@
         _greetingResolve: null,
     };
 
+    /* ── Intercept window.dispatchEvent before widget loads ─────────────
+         The SF SCRT2 widget fires custom events via window.dispatchEvent().
+         By overriding it here (before bootstrap.min.js runs) we catch every
+         event the widget dispatches — regardless of its name — and try to
+         extract agent message text from the event detail.                  */
+    (function () {
+        var _orig = window.dispatchEvent.bind(window);
+        window.dispatchEvent = function (event) {
+            try {
+                if (event && event.type) {
+                    var t = event.type.toLowerCase();
+                    if (t.includes('embedded') || t.includes('messag') ||
+                        t.includes('chat')     || t.includes('agent') || t.includes('bot')) {
+                        var detail = event.detail || {};
+                        console.log('[VA] dispatchEvent:', event.type,
+                                    JSON.stringify(detail).substring(0, 400));
+
+                        var text =
+                            detail.text ||
+                            detail.message ||
+                            (detail.body && detail.body.text) ||
+                            (detail.payload && detail.payload.text) ||
+                            (detail.conversationEntry &&
+                             detail.conversationEntry.entryPayload &&
+                             detail.conversationEntry.entryPayload.abstractMessage &&
+                             detail.conversationEntry.entryPayload.abstractMessage.text);
+
+                        if (text && typeof text === 'string' && text.trim().length > 5) {
+                            console.log('[VA] Message via dispatchEvent:', event.type,
+                                        text.substring(0, 120));
+                            _resolveAgentResponse(text.trim());
+                        }
+                    }
+                }
+            } catch (ignore) {}
+            return _orig(event);
+        };
+    })();
+
+    /* ── Explicit listeners for every known SCRT2 event name ──────────── */
+    [
+        'embeddedMessagingNewMessage',
+        'onEmbeddedMessagingNewMessage',
+        'embeddedMessagingConversationItemAdded',
+        'onEmbeddedMessagingConversationItemAdded',
+        'embeddedMessagingAgentMessage',
+        'onEmbeddedMessagingAgentMessage'
+    ].forEach(function (name) {
+        window.addEventListener(name, function (ev) {
+            var d = ev.detail || {};
+            console.log('[VA] Named event:', name, JSON.stringify(d).substring(0, 400));
+            var text = d.text || d.message ||
+                       (d.body && d.body.text) ||
+                       (d.payload && d.payload.text) ||
+                       (d.conversationEntry &&
+                        d.conversationEntry.entryPayload &&
+                        d.conversationEntry.entryPayload.abstractMessage &&
+                        d.conversationEntry.entryPayload.abstractMessage.text);
+            if (text && typeof text === 'string' && text.trim().length > 5) {
+                _resolveAgentResponse(text.trim());
+            }
+        });
+    });
+
     /* ── Kick off the widget ─────────────────────────────────────────── */
     function initEmbeddedMessaging() {
         try {
@@ -981,27 +1045,52 @@
             sendToAgent(text);
         }
 
-        /* ── Mic button events ───────────────────────────────────────── */
+        /* ── Mic button — consolidated tap handler ──────────────────── */
         let holdTimer = null;
+        let savedGreeting = FALLBACK_GREETING; // updated after init resolves
+
+        // All mic activation routes funnel through here
+        async function handleMicActivation() {
+            // Very first tap: speak the greeting (unlocks browser audio context)
+            if (!greetingSpoken) {
+                greetingSpoken = true;
+                setStatus('speaking', 'Playing greeting…');
+                await speak(savedGreeting);
+                setStatus('', 'Tap the mic to speak, or type below');
+                return;
+            }
+
+            if (isSpeaking) {
+                // Interrupt current speech and go straight to listening
+                if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+                isSpeaking = false;
+            }
+
+            if (isProcessing) return;
+
+            if (isRecording) stopRecording();
+            else             startRecording();
+        }
 
         micBtn.addEventListener('pointerdown', (e) => {
             e.preventDefault();
-            if (isSpeaking || isProcessing || micBtn.disabled) return;
-            holdTimer = setTimeout(() => startRecording(), 80);
+            if (micBtn.disabled) return;
+            // Only start hold-timer after greeting has been spoken
+            if (greetingSpoken && !isSpeaking && !isProcessing) {
+                holdTimer = setTimeout(() => startRecording(), 80);
+            }
         });
 
         micBtn.addEventListener('pointerup', (e) => {
             e.preventDefault();
             clearTimeout(holdTimer);
-            if (isRecording)                      stopRecording();
-            else if (!isSpeaking && !isProcessing) startRecording();
+            // Let the click event drive the logic so we don't double-fire
         });
 
         micBtn.addEventListener('click', (e) => {
             e.preventDefault();
             if (micBtn.disabled) return;
-            if (!isRecording && !isSpeaking && !isProcessing) startRecording();
-            else if (isRecording) stopRecording();
+            handleMicActivation();
         });
 
         /* ── Text input ──────────────────────────────────────────────── */
@@ -1049,20 +1138,10 @@
             const greeting = widgetGreeting || FALLBACK_GREETING;
 
             addBubble('agent', greeting);
+            savedGreeting = greeting; // mic handler will speak this on first tap
 
-            // Browser autoplay policy blocks audio without a prior user gesture.
-            // We display the greeting and enable the mic button first.
-            // On the very first mic press we'll speak the greeting.
             micBtn.disabled = false;
-            setStatus('', 'Tap the mic to begin — Nova will greet you');
-
-            // Speak the greeting on the first user interaction
-            micBtn.addEventListener('click', async function onFirstTap() {
-                if (!greetingSpoken && !isSpeaking && !isProcessing) {
-                    greetingSpoken = true;
-                    await speak(greeting);
-                }
-            }, { once: true });
+            setStatus('', 'Tap the mic to hear your greeting from Nova');
         }
 
         init();
