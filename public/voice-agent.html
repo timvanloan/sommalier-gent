@@ -399,6 +399,11 @@
     (function () {
         var _orig = window.dispatchEvent.bind(window);
         window.dispatchEvent = function (event) {
+            // ── Call the ORIGINAL first so bootstrap.min.js RPC handlers
+            //    run immediately — our processing must never add latency
+            //    inside the ESW_APP_READY_EVENT RPC window.
+            var result = _orig(event);
+
             try {
                 if (event && event.type) {
                     var t = event.type.toLowerCase();
@@ -409,9 +414,6 @@
                                     JSON.stringify(detail).substring(0, 400));
 
                         // ── onEmbeddedMessageSent — primary response channel ──
-                        // The widget streams agent responses token-by-token and
-                        // then fires a final Message entry with the complete text.
-                        // detail.conversationEntry.entryPayload is a JSON string.
                         if (event.type === 'onEmbeddedMessageSent' && detail.conversationEntry) {
                             var entry = detail.conversationEntry;
                             var rawPayload = entry.entryPayload;
@@ -419,7 +421,7 @@
                                 try {
                                     var payload = JSON.parse(rawPayload);
 
-                                    // Collect streaming tokens for a fast-path fallback
+                                    // Collect streaming tokens
                                     if (payload.entryType === 'StreamingToken') {
                                         var token =
                                             payload.token ||
@@ -430,7 +432,7 @@
                                         }
                                     }
 
-                                    // Final assembled Message — this is what we want to speak
+                                    // Final assembled Message — speak this
                                     if (payload.entryType === 'Message' && payload.abstractMessage) {
                                         var abMsg = payload.abstractMessage;
                                         var role   = (abMsg.role || abMsg.sender || '').toLowerCase();
@@ -440,7 +442,7 @@
 
                                         if (text && text.length > 5 && role !== 'enduser') {
                                             console.log('[VA] Agent reply via Message:', text.substring(0, 120));
-                                            sfWidget._streamBuffer = ''; // clear buffer
+                                            sfWidget._streamBuffer = '';
                                             _resolveAgentResponse(text.trim());
                                         }
                                     }
@@ -448,25 +450,25 @@
                                     console.warn('[VA] entryPayload parse error:', parseErr);
                                 }
                             }
-                            return _orig(event);
-                        }
+                        } else {
+                            // Generic fallback: look for text in top-level fields
+                            var text =
+                                detail.text    ||
+                                detail.message ||
+                                (detail.body    && detail.body.text)    ||
+                                (detail.payload && detail.payload.text);
 
-                        // ── Generic fallback: look for text in top-level fields ──
-                        var text =
-                            detail.text ||
-                            detail.message ||
-                            (detail.body && detail.body.text) ||
-                            (detail.payload && detail.payload.text);
-
-                        if (text && typeof text === 'string' && text.trim().length > 5) {
-                            console.log('[VA] Message via dispatchEvent:', event.type,
-                                        text.substring(0, 120));
-                            _resolveAgentResponse(text.trim());
+                            if (text && typeof text === 'string' && text.trim().length > 5) {
+                                console.log('[VA] Message via dispatchEvent:', event.type,
+                                            text.substring(0, 120));
+                                _resolveAgentResponse(text.trim());
+                            }
                         }
                     }
                 }
             } catch (ignore) {}
-            return _orig(event);
+
+            return result;
         };
     })();
 
@@ -501,6 +503,9 @@
             var host = document.getElementById('sf-widget-host');
             if (host && window.embeddedservice_bootstrap) {
                 embeddedservice_bootstrap.settings.targetElement = host;
+                // inline mode embeds the chat fully inside our container
+                // (Salesforce recommends this when targetElement is set)
+                embeddedservice_bootstrap.settings.displayMode = 'inline';
             }
             embeddedservice_bootstrap.settings.language = 'en_US';
             embeddedservice_bootstrap.init(
@@ -1206,6 +1211,13 @@
                     }
                 }, 200);
             });
+
+            if (!sfWidget.ready && !sfWidget.chatOpen) {
+                // Widget failed to initialize — show a clear error
+                setStatus('', 'Agent service unavailable — please refresh the page');
+                addBubble('agent', 'The Salesforce agent service is temporarily unavailable. Please refresh the page to try again.');
+                return; // mic stays disabled
+            }
 
             // Try to capture the real agent greeting from the widget
             // (the widget fires its opening message shortly after chat is launched)
