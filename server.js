@@ -338,46 +338,35 @@ app.get('/api/debug-agent', async (req, res) => {
     const base = `${SALESFORCE_DOMAIN_URL}/services/data/${ver}`;
     const results = {};
 
-    // Explore the /ai/ namespace
-    const aiRes = await fetch(`${base}/ai`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-    results.aiNamespace = { status: aiRes.status, body: (await aiRes.text()).substring(0, 500) };
-
-    // Explore chatbot namespace
-    const cbRes = await fetch(`${base}/chatbot`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-    results.chatbotNamespace = { status: cbRes.status, body: (await cbRes.text()).substring(0, 500) };
-
-    // Try chatbot/agents path
-    const cbAgentsRes = await fetch(`${base}/chatbot/agents`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-    results.chatbotAgents = { status: cbAgentsRes.status, body: (await cbAgentsRes.text()).substring(0, 500) };
-
-    const sessionBody = JSON.stringify({
-      externalSessionKey: 'debug-' + Date.now(),
-      instanceConfig: { endpoint: SALESFORCE_DOMAIN_URL },
-      bypassUser: true
-    });
-
-    // Try session creation under chatbot and ai namespaces
-    const sessionPaths = [
-      `/chatbot/agents/${SALESFORCE_AGENT_ID}/sessions`,
-      `/ai/agents/${SALESFORCE_AGENT_ID}/sessions`,
-      `/ai/agent/sessions`,
-      `/chatbot/sessions`,
-    ];
-    results.sessionTests = {};
-    for (const p of sessionPaths) {
-      const r = await fetch(`${base}${p}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: sessionBody
-      });
-      results.sessionTests[p] = { status: r.status, body: (await r.text()).substring(0, 300) };
-    }
-
-    // Also try SOQL to find Bot/Agent records
-    const soqlRes = await fetch(`${base}/query?q=${encodeURIComponent("SELECT Id, DeveloperName FROM BotDefinition LIMIT 5")}`, {
+    // Get ALL 5 bot definitions
+    const botRes = await fetch(`${base}/query?q=${encodeURIComponent("SELECT Id, DeveloperName, MasterLabel FROM BotDefinition ORDER BY CreatedDate DESC LIMIT 10")}`, {
       headers: { 'Authorization': `Bearer ${accessToken}` }
     });
-    results.botDefinitions = { status: soqlRes.status, body: (await soqlRes.text()).substring(0, 500) };
+    results.botDefinitions = { status: botRes.status, body: (await botRes.text()).substring(0, 1500) };
+
+    // Explore connect namespace for agent paths
+    const connectRes = await fetch(`${base}/connect`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    const connectBody = await connectRes.text();
+    try {
+      const connectData = JSON.parse(connectBody);
+      const keys = Object.keys(connectData);
+      results.connectKeys = keys.filter(k => k.toLowerCase().includes('agent') || k.toLowerCase().includes('bot') || k.toLowerCase().includes('ai') || k.toLowerCase().includes('einstein'));
+      results.connectAllKeys = keys;
+    } catch(e) {
+      results.connectRaw = connectBody.substring(0, 500);
+    }
+
+    // Try connect/agentforce
+    const paths = [
+      `/connect/agentforce/agents/${SALESFORCE_AGENT_ID}/sessions`,
+      `/connect/bots/${SALESFORCE_AGENT_ID}/sessions`,
+    ];
+    results.connectTests = {};
+    const sessionBody = JSON.stringify({ externalSessionKey: 'debug-' + Date.now(), instanceConfig: { endpoint: SALESFORCE_DOMAIN_URL }, bypassUser: true });
+    for (const p of paths) {
+      const r = await fetch(`${base}${p}`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: sessionBody });
+      results.connectTests[p] = { status: r.status, body: (await r.text()).substring(0, 300) };
+    }
 
     results.agentId = SALESFORCE_AGENT_ID;
     res.json(results);
