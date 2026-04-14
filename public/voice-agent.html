@@ -387,6 +387,8 @@
         _seenMsgCount: 0,
         _initialGreetingDone: false,
         _greetingResolve: null,
+        // Streaming token buffer (agent streams tokens before final Message fires)
+        _streamBuffer: '',
     };
 
     /* ── Intercept window.dispatchEvent before widget loads ─────────────
@@ -406,15 +408,55 @@
                         console.log('[VA] dispatchEvent:', event.type,
                                     JSON.stringify(detail).substring(0, 400));
 
+                        // ── onEmbeddedMessageSent — primary response channel ──
+                        // The widget streams agent responses token-by-token and
+                        // then fires a final Message entry with the complete text.
+                        // detail.conversationEntry.entryPayload is a JSON string.
+                        if (event.type === 'onEmbeddedMessageSent' && detail.conversationEntry) {
+                            var entry = detail.conversationEntry;
+                            var rawPayload = entry.entryPayload;
+                            if (rawPayload) {
+                                try {
+                                    var payload = JSON.parse(rawPayload);
+
+                                    // Collect streaming tokens for a fast-path fallback
+                                    if (payload.entryType === 'StreamingToken') {
+                                        var token =
+                                            payload.token ||
+                                            (payload.streamingToken && payload.streamingToken.token) || '';
+                                        if (token) {
+                                            sfWidget._streamBuffer =
+                                                (sfWidget._streamBuffer || '') + token;
+                                        }
+                                    }
+
+                                    // Final assembled Message — this is what we want to speak
+                                    if (payload.entryType === 'Message' && payload.abstractMessage) {
+                                        var abMsg = payload.abstractMessage;
+                                        var role   = (abMsg.role || abMsg.sender || '').toLowerCase();
+                                        var text   =
+                                            (abMsg.staticContent && abMsg.staticContent.text) ||
+                                            (abMsg.textBody    && abMsg.textBody.text)          || '';
+
+                                        if (text && text.length > 5 && role !== 'enduser') {
+                                            console.log('[VA] Agent reply via Message:', text.substring(0, 120));
+                                            sfWidget._streamBuffer = ''; // clear buffer
+                                            _resolveAgentResponse(text.trim());
+                                        }
+                                    }
+                                } catch (parseErr) {
+                                    console.warn('[VA] entryPayload parse error:', parseErr);
+                                }
+                            }
+                            return _orig(event);
+                        }
+
+                        // ── Generic fallback: look for text in top-level fields ──
                         var text =
                             detail.text ||
                             detail.message ||
                             (detail.body && detail.body.text) ||
-                            (detail.payload && detail.payload.text) ||
-                            (detail.conversationEntry &&
-                             detail.conversationEntry.entryPayload &&
-                             detail.conversationEntry.entryPayload.abstractMessage &&
-                             detail.conversationEntry.entryPayload.abstractMessage.text);
+                            (detail.payload && detail.payload.text);
 
                         if (text && typeof text === 'string' && text.trim().length > 5) {
                             console.log('[VA] Message via dispatchEvent:', event.type,
@@ -912,12 +954,20 @@
             let reply = null;
 
             try {
+                sfWidget._streamBuffer = ''; // clear any previous tokens
                 // Primary: use the live SF embedded widget
                 const sent = await sfSendMessage(message);
 
                 if (sent) {
                     reply = await sfWaitForResponse(30000);
                     if (reply) console.log('[VA] Got reply from widget:', reply.substring(0, 80));
+
+                    // If the final Message entry was missed but streaming tokens were collected
+                    if (!reply && sfWidget._streamBuffer && sfWidget._streamBuffer.length > 20) {
+                        reply = sfWidget._streamBuffer.trim();
+                        sfWidget._streamBuffer = '';
+                        console.log('[VA] Using streamed token buffer as reply:', reply.substring(0, 80));
+                    }
                 }
 
                 // Fallback: Agentforce REST API (in case it gets enabled later)
